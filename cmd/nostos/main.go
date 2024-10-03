@@ -24,9 +24,12 @@ import (
 	"path/filepath"
 	"time"
 
+        "github.com/wycleffsean/nostos/lang"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	//
@@ -40,6 +43,8 @@ import (
 )
 
 func main() {
+        _, _ = lang.Lex("my lexer", "- yaml")
+
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
@@ -54,8 +59,14 @@ func main() {
 		panic(err.Error())
 	}
 
+	err = discover(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	// create the clientset
 	clientset, err := kubernetes.NewForConfig(config)
+
 	if err != nil {
 		panic(err.Error())
 	}
@@ -87,3 +98,17 @@ func main() {
 	}
 }
 
+func discover(config *rest.Config) error {
+	dclient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return err
+	}
+	glist, resources, rerrors, err := dclient.GroupsAndMaybeResources()
+	if err != nil {
+		return err
+	}
+    	fmt.Println("%q", glist)
+	_ = resources
+	_ = rerrors
+	return nil
+}
