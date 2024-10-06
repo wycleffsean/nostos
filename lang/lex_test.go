@@ -38,13 +38,6 @@ func assertScalar(t *testing.T, got, wanted item) {
 
 // Tests
 
-// func TestMapKeyValue(t *testing.T) {
-// 	_, items := Lex("foo: bar")
-// 	gotkey, gotvalue := pair(t, items)
-// 	assertScalar(t, gotkey, item{itemString, "foo"})
-// 	assertScalar(t, gotvalue, item{itemString, "bar"})
-// }
-
 func TestString(t *testing.T) {
 	_, items := Lex("yo")
 	got := single(t, items)
@@ -60,25 +53,32 @@ func TestQuotedString(t *testing.T) {
 
 func TestQuotedStringUnterminated(t *testing.T) {
 	_, items := Lex(`"unterminated`)
-	got := single(t, items)
+	got := <- items
 	assertScalar(t, got, item{itemError, "EOF reached in unterminated string"})
 }
 
-// func TestInteger(t *testing.T) {
-// 	_, items := Lex("123")
-// 	got := single(t, items)
-// 	assertScalar(t, got, item{itemNumber, "123"})
-// }
+func TestInteger(t *testing.T) {
+	_, items := Lex("123")
+	got := single(t, items)
+	assertScalar(t, got, item{itemNumber, "123"})
+}
 
-// func TestFloat(t *testing.T) {
-// 	_, items := Lex("123.99")
-// 	got := single(t, items)
-// 	assertScalar(t, got, item{itemNumber, "123.99"})
-// }
+func TestFloat(t *testing.T) {
+	_, items := Lex("123.99")
+	got := single(t, items)
+	assertScalar(t, got, item{itemNumber, "123.99"})
+}
 
 func TestList(t *testing.T) {
 	_, items := Lex("- yo")
 	itema, itemb := pair(t, items)
 	assertScalar(t, itema, item{itemList, ""})
 	assertScalar(t, itemb, item{itemString, "yo"})
+}
+
+func TestMap(t *testing.T) {
+	_, items := Lex("foo: bar")
+	itema, itemb := pair(t, items)
+	assertScalar(t, itema, item{itemKey, "foo"})
+	assertScalar(t, itemb, item{itemString, "bar"})
 }

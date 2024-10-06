@@ -16,6 +16,7 @@ const (
 	itemDocEnd
 	itemEOF
 	itemList
+	itemKey
 	// itemElse
 	// itemEnd
 	// itemField
@@ -74,8 +75,7 @@ func (l *lexer) run() {
 	for state := lexFile; state != nil; {
 		state = state(l)
 	}
-	l.emit(itemEOF) // TODO: wrong place to put this :/
-	close(l.items)  // No more tokens will be delivered
+	close(l.items) // No more tokens will be delivered
 }
 
 func (l *lexer) emit(t itemType) {
@@ -139,8 +139,16 @@ func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	return nil
 }
 
+func isAlpha(r rune) bool {
+	return r >= 'A' && r <= 'z'
+}
+
+func isNumber(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
 func isAlphaNumeric(r rune) bool {
-	return r >= '0' && r <= 'z'
+	return isAlpha(r) || isNumber(r)
 }
 
 func lexFile(l *lexer) stateFn {
@@ -149,21 +157,29 @@ func lexFile(l *lexer) stateFn {
 }
 
 func lexInDocument(l *lexer) stateFn {
-    l.acceptRun(" ")
-    l.ignore()
-    switch l.peek() {
-        case '-': return lexList
-        default: return lexString
-    }
+	l.acceptRun(" ")
+	l.ignore()
+	r := l.peek()
+	switch {
+	case r == 0:
+		l.emit(itemEOF)
+		return nil
+	case r == '-':
+		return lexList
+	case isNumber(r):
+		return lexNumber
+	default:
+		return lexString
+	}
 }
 
 func lexList(l *lexer) stateFn {
-    l.emit(itemList)
-    if l.next() != '-' {
-        return l.errorf("oops! we were expecting a list here")
-    }
-    l.ignore()
-    return lexInDocument
+	l.emit(itemList)
+	if l.next() != '-' {
+		return l.errorf("oops! we were expecting a list here")
+	}
+	l.ignore()
+	return lexInDocument
 }
 
 func lexString(l *lexer) stateFn {
@@ -187,9 +203,16 @@ func lexString(l *lexer) stateFn {
 		for isAlphaNumeric(l.peek()) {
 			l.next()
 		}
-		l.emit(itemString)
+		if l.peek() == ':' {
+			l.emit(itemKey)
+			l.next()
+			l.ignore()
+			return lexInDocument
+		} else {
+			l.emit(itemString)
+		}
 	}
-	return nil
+	return lexInDocument
 }
 
 func lexKeyValue(l *lexer) stateFn {
