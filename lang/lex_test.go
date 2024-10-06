@@ -75,3 +75,10 @@ func TestQuotedStringUnterminated(t *testing.T) {
 // 	got := single(t, items)
 // 	assertScalar(t, got, item{itemNumber, "123.99"})
 // }
+
+func TestList(t *testing.T) {
+	_, items := Lex("- yo")
+	itema, itemb := pair(t, items)
+	assertScalar(t, itema, item{itemList, ""})
+	assertScalar(t, itemb, item{itemString, "yo"})
+}

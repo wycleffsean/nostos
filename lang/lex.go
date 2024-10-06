@@ -15,6 +15,7 @@ const (
 	itemDocStart
 	itemDocEnd
 	itemEOF
+	itemList
 	// itemElse
 	// itemEnd
 	// itemField
@@ -148,7 +149,21 @@ func lexFile(l *lexer) stateFn {
 }
 
 func lexInDocument(l *lexer) stateFn {
-	return lexString
+    l.acceptRun(" ")
+    l.ignore()
+    switch l.peek() {
+        case '-': return lexList
+        default: return lexString
+    }
+}
+
+func lexList(l *lexer) stateFn {
+    l.emit(itemList)
+    if l.next() != '-' {
+        return l.errorf("oops! we were expecting a list here")
+    }
+    l.ignore()
+    return lexInDocument
 }
 
 func lexString(l *lexer) stateFn {
@@ -159,7 +174,7 @@ func lexString(l *lexer) stateFn {
 			r := l.peek()
 			if r == 0 {
 				return l.errorf("EOF reached in unterminated string")
-			} else if r == '"' && l.input[l.pos - 1] != '\\' {
+			} else if r == '"' && l.input[l.pos-1] != '\\' {
 				break
 			}
 			l.next()
