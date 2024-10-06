@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"time"
 
-        "github.com/wycleffsean/nostos/lang"
+	"github.com/wycleffsean/nostos/lang"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
@@ -43,7 +43,7 @@ import (
 )
 
 func main() {
-        _, _ = lang.Lex("my lexer", "- yaml")
+	_, _ = lang.Lex("my lexer", "- yaml")
 
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
@@ -65,7 +65,17 @@ func main() {
 	}
 
 	// create the clientset
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := func() (*kubernetes.Clientset, error) {
+		configShallowCopy := *config
+		if configShallowCopy.UserAgent == "" {
+			configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+		}
+		httpClient, err := rest.HTTPClientFor(&configShallowCopy)
+		if err != nil {
+			return nil, err
+		}
+		return kubernetes.NewForConfigAndClient(&configShallowCopy, httpClient)
+	}()
 
 	if err != nil {
 		panic(err.Error())
@@ -107,7 +117,7 @@ func discover(config *rest.Config) error {
 	if err != nil {
 		return err
 	}
-    	fmt.Println("%q", glist)
+	fmt.Println("%q", glist)
 	_ = resources
 	_ = rerrors
 	return nil

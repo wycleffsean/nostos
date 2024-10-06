@@ -12,6 +12,8 @@ const (
 	itemError itemType = iota // error occurred;
 	// value is text of error
 	itemDot // the cursor, spelled '.'
+	itemDocStart
+	itemDocEnd
 	itemEOF
 	// itemElse
 	// itemEnd
@@ -24,7 +26,7 @@ const (
 	// itemRange
 	// itemRawString
 	// itemRightMeta
-	// itemString
+	itemString
 	// itemText
 )
 
@@ -40,16 +42,15 @@ func (i item) String() string {
 	case itemError:
 		return i.val
 	}
-	if len(i.val) > 10 {
-		return fmt.Sprintf("%.10q...", i.val)
+	if len(i.val) > 50 {
+		return fmt.Sprintf("%.50s...", i.val)
 	}
-	return fmt.Sprintf("%q", i.val)
+	return fmt.Sprintf("%s", i.val)
 }
 
 // holds the state of the scanner
 type lexer struct {
-	// TODO: input should be a reader
-	name  string    // used only for error reports
+	// TODO: input should be a (buffered) reader
 	input string    // the string being scanned
 	start int       // start position of this item
 	pos   int       // current position in the input
@@ -59,9 +60,8 @@ type lexer struct {
 
 type stateFn func(*lexer) stateFn
 
-func Lex(name, input string) (*lexer, chan item) {
+func Lex(input string) (*lexer, chan item) {
 	l := &lexer{
-		name:  name,
 		input: input,
 		items: make(chan item),
 	}
@@ -70,10 +70,11 @@ func Lex(name, input string) (*lexer, chan item) {
 }
 
 func (l *lexer) run() {
-	for state := lexText; state != nil; {
+	for state := lexFile; state != nil; {
 		state = state(l)
 	}
-	close(l.items) // No more tokens will be delivered
+	l.emit(itemEOF) // TODO: wrong place to put this :/
+	close(l.items)  // No more tokens will be delivered
 }
 
 func (l *lexer) emit(t itemType) {
@@ -81,10 +82,10 @@ func (l *lexer) emit(t itemType) {
 	l.start = l.pos
 }
 
-func (l *lexer) next() (rune) {
+func (l *lexer) next() rune {
 	if l.pos >= len(l.input) {
 		l.width = 0
-		return 0 // TODO: how do you yield EOF?
+		return 0
 	}
 	var r rune
 	r, l.width =
@@ -138,17 +139,58 @@ func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 }
 
 func isAlphaNumeric(r rune) bool {
-    return r >= '0' && r <= 'z'
+	return r >= '0' && r <= 'z'
 }
 
-func lexText(l *lexer) stateFn {
-    _ = l
-    return nil
+func lexFile(l *lexer) stateFn {
+	_ = l
+	return lexInDocument
 }
 
-func lexInsideAction(l *lexer) stateFn {
-    _ = l
-    return nil
+func lexInDocument(l *lexer) stateFn {
+	return lexString
+}
+
+func lexString(l *lexer) stateFn {
+	if l.next() == '"' {
+		// quoted strings
+		l.ignore() // skip quote
+		for {
+			r := l.peek()
+			if r == 0 {
+				return l.errorf("EOF reached in unterminated string")
+			} else if r == '"' && l.input[l.pos - 1] != '\\' {
+				break
+			}
+			l.next()
+		}
+		l.emit(itemString)
+		l.next() // consume and skip double quote
+		l.ignore()
+	} else {
+		// unquoted strings
+		for isAlphaNumeric(l.peek()) {
+			l.next()
+		}
+		l.emit(itemString)
+	}
+	return nil
+}
+
+func lexKeyValue(l *lexer) stateFn {
+	for isAlphaNumeric(l.peek()) {
+		l.next()
+	}
+	l.emit(itemString)
+	// can there be blank spaces between key and colon delimiter?
+	// l.acceptRun(" ")
+	if l.peek() != ':' {
+		l.next()
+		return l.errorf("key must be followed by a colon %q",
+			l.input[l.start:l.pos])
+	}
+	l.ignore()
+	return nil
 }
 
 func lexNumber(l *lexer) stateFn {
@@ -167,12 +209,12 @@ func lexNumber(l *lexer) stateFn {
 		l.accept("+-")
 		l.acceptRun("0123456789")
 	}
-	// Nex thing can't be alphanumeric
+	// Next thing can't be alphanumeric
 	if isAlphaNumeric(l.peek()) {
 		l.next()
 		return l.errorf("bad number syntax: %q",
 			l.input[l.start:l.pos])
 	}
 	l.emit(itemNumber)
-	return lexInsideAction
+	return lexInDocument
 }
