@@ -8,6 +8,7 @@ import (
 
 type itemType int
 
+//go:generate stringer -type=itemType
 const (
 	itemError itemType = iota // error occurred;
 	// value is text of error
@@ -16,7 +17,7 @@ const (
 	itemDocEnd
 	itemEOF
 	itemList
-	itemKey
+	itemColon
 	// itemElse
 	// itemEnd
 	// itemField
@@ -44,10 +45,10 @@ func (i item) String() string {
 	case itemError:
 		return i.val
 	}
-	if len(i.val) > 50 {
-		return fmt.Sprintf("%.50s...", i.val)
+	if len(i.val) > 20 {
+		return fmt.Sprintf("[%s]%.50s...", i.typ, i.val)
 	}
-	return fmt.Sprintf("%s", i.val)
+	return fmt.Sprintf("[%s]%s", i.typ, i.val)
 }
 
 // holds the state of the scanner
@@ -151,6 +152,10 @@ func isAlphaNumeric(r rune) bool {
 	return isAlpha(r) || isNumber(r)
 }
 
+func isValidKey(r rune) bool {
+	return isAlphaNumeric(r) || r == '/'
+}
+
 func lexFile(l *lexer) stateFn {
 	_ = l
 	return lexInDocument
@@ -166,6 +171,10 @@ func lexInDocument(l *lexer) stateFn {
 		return nil
 	case r == '-':
 		return lexList
+	case r == ':':
+		l.next()
+		l.emit(itemColon)
+		return lexInDocument
 	case isNumber(r):
 		return lexNumber
 	default:
@@ -182,6 +191,14 @@ func lexList(l *lexer) stateFn {
 	return lexInDocument
 }
 
+func lexNonSpacedString(l *lexer) {
+	// unquoted strings
+	for isValidKey(l.peek()) {
+		l.next()
+	}
+	l.emit(itemString)
+}
+
 func lexString(l *lexer) stateFn {
 	if l.next() == '"' {
 		// quoted strings
@@ -189,6 +206,7 @@ func lexString(l *lexer) stateFn {
 		for {
 			r := l.peek()
 			if r == 0 {
+				l.ignore()
 				return l.errorf("EOF reached in unterminated string")
 			} else if r == '"' && l.input[l.pos-1] != '\\' {
 				break
@@ -199,36 +217,9 @@ func lexString(l *lexer) stateFn {
 		l.next() // consume and skip double quote
 		l.ignore()
 	} else {
-		// unquoted strings
-		for isAlphaNumeric(l.peek()) {
-			l.next()
-		}
-		if l.peek() == ':' {
-			l.emit(itemKey)
-			l.next()
-			l.ignore()
-			return lexInDocument
-		} else {
-			l.emit(itemString)
-		}
+		lexNonSpacedString(l)
 	}
 	return lexInDocument
-}
-
-func lexKeyValue(l *lexer) stateFn {
-	for isAlphaNumeric(l.peek()) {
-		l.next()
-	}
-	l.emit(itemString)
-	// can there be blank spaces between key and colon delimiter?
-	// l.acceptRun(" ")
-	if l.peek() != ':' {
-		l.next()
-		return l.errorf("key must be followed by a colon %q",
-			l.input[l.start:l.pos])
-	}
-	l.ignore()
-	return nil
 }
 
 func lexNumber(l *lexer) stateFn {

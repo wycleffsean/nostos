@@ -1,8 +1,13 @@
-nostos: **/*.go
+nostos: **/*.go lang/itemtype_string.go
 	go build github.com/wycleffsean/nostos/cmd/nostos
+
+# requires go install golang.org/x/tools/cmd/stringer
+lang/itemtype_string.go:
+	go generate ./lang
 
 .PHONY: test
 test:
+	go generate ./lang
 	go test github.com/wycleffsean/nostos/lang
 
 # this requires
