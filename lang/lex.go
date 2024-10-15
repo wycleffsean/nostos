@@ -16,6 +16,7 @@ const (
 	itemDocStart
 	itemDocEnd
 	itemEOF
+	itemIndent
 	itemList
 	itemColon
 	// itemElse
@@ -162,24 +163,46 @@ func lexFile(l *lexer) stateFn {
 }
 
 func lexInDocument(l *lexer) stateFn {
-	l.acceptRun(" ")
-	l.ignore()
 	r := l.peek()
 	switch {
 	case r == 0:
 		l.emit(itemEOF)
 		return nil
+	case r == '\n':
+		return lexIndent
 	case r == '-':
 		return lexList
 	case r == ':':
 		l.next()
 		l.emit(itemColon)
 		return lexInDocument
-	case isNumber(r):
-		return lexNumber
 	default:
+		l.acceptRun(" ")
+		l.ignore()
+		if isNumber(l.peek()) {
+			return lexNumber
+		}
 		return lexString
 	}
+}
+
+// a newline or a prior indent can get us here
+func lexIndent(l *lexer) stateFn {
+	if l.peek() == '\n' {
+		l.next()
+		l.ignore()
+	}
+	if l.peek() == ' ' {
+		l.next()
+		if l.next() != ' ' {
+			return l.errorf("indents must contain two spaces")
+		}
+		l.emit(itemIndent)
+		if l.peek() == ' ' {
+			return lexIndent
+		}
+	}
+	return lexInDocument
 }
 
 func lexList(l *lexer) stateFn {

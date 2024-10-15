@@ -103,14 +103,24 @@ func TestQuotedStringUnterminated(t *testing.T) {
 	assertScalar(t, value, item{itemError, "EOF reached in unterminated string"})
 }
 
-
+func TestIndent(t *testing.T) {
+	_, items := Lex("\n  foo: bar")
+	indent := <-items
+	key := <-items
+	colon := <-items
+	value := <-items
+	assertScalar(t, indent, item{itemIndent, "  "})
+	assertScalar(t, key, item{itemString, "foo"})
+	assertScalar(t, colon, item{itemColon, ":"})
+	assertScalar(t, value, item{itemString, "bar"})
+}
 
 func TestManifest(t *testing.T) {
     manifest := `
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: example-deployment
+  name: "example-deployment"
 spec:
   replicas: 3
   selector:
@@ -122,13 +132,60 @@ spec:
         app: example
     spec:
       containers:
-      - name: example-container
-        image: example-image
+      - name: "example-container"
+        image: "example-image"
         ports:
         - containerPort: 8080
     `
 	_, items := Lex(manifest)
-	assertScalar(t, <- items, item{itemString, "\napiVersion"})
+	assertScalar(t, <- items, item{itemString, "apiVersion"})
 	assertScalar(t, <- items, item{itemColon, ":"})
 	assertScalar(t, <- items, item{itemString, "apps/v1"})
+	assertScalar(t, <- items, item{itemString, "kind"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemString, "Deployment"})
+	assertScalar(t, <- items, item{itemString, "metadata"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemString, "name"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemString, "example-deployment"})
+	assertScalar(t, <- items, item{itemString, "spec"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemString, "replicas"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemNumber, "3"})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemString, "selector"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemString, "matchLabels"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemString, "app"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemString, "example"})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemString, "template"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemString, "metadata"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemString, "labels"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemIndent, "  "})
+	assertScalar(t, <- items, item{itemString, "app"})
+	assertScalar(t, <- items, item{itemColon, ":"})
+	assertScalar(t, <- items, item{itemString, "example"})
 }
