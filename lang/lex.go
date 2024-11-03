@@ -64,7 +64,7 @@ type lexer struct {
 
 type stateFn func(*lexer) stateFn
 
-func Lex(input string) (*lexer, chan item) {
+func NewStringLexer(input string) (*lexer, chan item) {
 	l := &lexer{
 		input: input,
 		items: make(chan item),

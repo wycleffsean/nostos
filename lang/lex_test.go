@@ -48,38 +48,38 @@ func assertScalar(t *testing.T, got, wanted item) {
 // Tests
 
 func TestString(t *testing.T) {
-	_, items := Lex("yo")
+	_, items := NewStringLexer("yo")
 	got := single(t, items)
 	assertScalar(t, got, item{itemString, "yo"})
 }
 
 func TestUnquotedStringWithSymbols(t *testing.T) {
-	_, items := Lex("apps/v1")
+	_, items := NewStringLexer("apps/v1")
 	got := single(t, items)
 	assertScalar(t, got, item{itemString, "apps/v1"})
 }
 
 func TestInteger(t *testing.T) {
-	_, items := Lex("123")
+	_, items := NewStringLexer("123")
 	got := single(t, items)
 	assertScalar(t, got, item{itemNumber, "123"})
 }
 
 func TestFloat(t *testing.T) {
-	_, items := Lex("123.99")
+	_, items := NewStringLexer("123.99")
 	got := single(t, items)
 	assertScalar(t, got, item{itemNumber, "123.99"})
 }
 
 func TestList(t *testing.T) {
-	_, items := Lex("- yo")
+	_, items := NewStringLexer("- yo")
 	itema, itemb := pair(t, items)
 	assertScalar(t, itema, item{itemList, ""})
 	assertScalar(t, itemb, item{itemString, "yo"})
 }
 
 func TestMap(t *testing.T) {
-	_, items := Lex("foo: bar")
+	_, items := NewStringLexer("foo: bar")
 	key, value := keyValue(t, items)
 	assertScalar(t, key, item{itemString, "foo"})
 	assertScalar(t, value, item{itemString, "bar"})
@@ -87,14 +87,14 @@ func TestMap(t *testing.T) {
 
 // TODO: Should lexer drop escape backslashes?
 func TestQuotedString(t *testing.T) {
-	_, items := Lex(`foo: "this is a \"quoted\" string"`)
+	_, items := NewStringLexer(`foo: "this is a \"quoted\" string"`)
 	key, value := keyValue(t, items)
 	assertScalar(t, key, item{itemString, "foo"})
 	assertScalar(t, value, item{itemString, `this is a \"quoted\" string`})
 }
 
 func TestQuotedStringUnterminated(t *testing.T) {
-	_, items := Lex(`foo: "unterminated`)
+	_, items := NewStringLexer(`foo: "unterminated`)
 	key := <-items
 	colon := <-items
 	value := <-items
@@ -104,7 +104,7 @@ func TestQuotedStringUnterminated(t *testing.T) {
 }
 
 func TestIndent(t *testing.T) {
-	_, items := Lex("\n  foo: bar")
+	_, items := NewStringLexer("\n  foo: bar")
 	indent := <-items
 	key := <-items
 	colon := <-items
@@ -137,7 +137,7 @@ spec:
         ports:
         - containerPort: 8080
     `
-	_, items := Lex(manifest)
+	_, items := NewStringLexer(manifest)
 	assertScalar(t, <-items, item{itemString, "apiVersion"})
 	assertScalar(t, <-items, item{itemColon, ":"})
 	assertScalar(t, <-items, item{itemString, "apps/v1"})
