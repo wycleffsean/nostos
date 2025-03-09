@@ -21,5 +21,5 @@ debug:
 setup:
 	go install golang.org/x/tools/cmd/stringer
 	go install github.com/spf13/cobra-cli@latest
-	go install golang.org/x/tools/dlv@latest
-	go install golang.org/x/tools/gdlv@latest
+	# go install golang.org/x/tools/dlv@latest
+	# go install golang.org/x/tools/gdlv@latest

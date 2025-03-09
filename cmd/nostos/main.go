@@ -43,7 +43,7 @@ import (
 )
 
 func main() {
-	_, _ = lang.Lex("my lexer", "- yaml")
+	_, _ = lang.Lex("- yaml")
 
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
