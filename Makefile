@@ -4,7 +4,7 @@
 # 	go build github.com/wycleffsean/nostos/cmd/nostos
 # Build the project (assuming your main package is in cmd/nostos)
 bin/nostos: **/*.go lang/itemtype_string.go
-	go build -o bin/nostos ./cmd/nostos
+	go build -o bin/nostos .
 
 # requires go install golang.org/x/tools/cmd/stringer
 lang/itemtype_string.go:

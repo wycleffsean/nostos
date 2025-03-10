@@ -1,77 +1,87 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
-var cfgFile string
+var kubeconfig string
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
+// RootCmd is the base command for Nostos.
+var RootCmd = &cobra.Command{
 	Use:   "nostos",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Short: "Nostos is a Helm replacement for Kubernetes with its own DSL.",
+	Long: `Nostos is a programming language designed for Kubernetes configuration,
+offering a plan/apply workflow similar to Terraform, as well as an integrated language server.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Nostos CLI. Use --help for more information.")
+	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	err := rootCmd.Execute()
+// initConfig initializes configuration and loads the kubeconfig file.
+func initConfig() {
+	var cfgFile string
+	if kubeconfig != "" {
+		cfgFile = kubeconfig
+	} else {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			fmt.Println("Unable to determine home directory:", err)
+			return
+		}
+		cfgFile = filepath.Join(home, ".kube", "config")
+	}
+
+	// Tell Viper which file to read.
+	viper.SetConfigFile(cfgFile)
+	// If there's no file extension, explicitly set the config type to YAML.
+	if filepath.Ext(cfgFile) == "" {
+		viper.SetConfigType("yaml")
+	}
+
+	// Attempt to read the kubeconfig file; do not fail if it doesn't exist.
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			fmt.Println("Kubeconfig file not found, continuing without it.")
+		} else {
+			fmt.Println("Error reading kubeconfig file:", err)
+		}
+	} else {
+		fmt.Println("Using kubeconfig file:", viper.ConfigFileUsed())
+	}
+}
+
+// GetClientConfig builds a Kubernetes REST configuration using the kubeconfig path
+// provided via Viper (either default or overridden by the --kubeconfig flag).
+func GetClientConfig() (*rest.Config, error) {
+	// Get the kubeconfig path from Viper.
+	kubeconfigPath := viper.GetString("kubeconfig")
+	// Build the config from flags. Passing an empty master URL will let the function use the kubeconfig.
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	if err != nil {
+		return nil, fmt.Errorf("failed to build kubeconfig: %w", err)
+	}
+	return config, nil
+}
+
+// Execute runs the root command.
+func Execute() {
+	if err := RootCmd.Execute(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
 func init() {
+	// Initialize configuration when any command is executed.
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.nostos.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".nostos" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".nostos")
-	}
-
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-	}
+	// Add a persistent flag for specifying kubeconfig.
+	RootCmd.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", "", "path to the kubeconfig file (default is $HOME/.kube/config)")
 }
