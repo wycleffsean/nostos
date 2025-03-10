@@ -6,6 +6,10 @@
 bin/nostos: **/*.go lang/itemtype_string.go
 	go build -o bin/nostos .
 
+.PHONY: plan
+plan: bin/nostos
+	$< plan
+
 # requires go install golang.org/x/tools/cmd/stringer
 lang/itemtype_string.go:
 	go generate ./lang

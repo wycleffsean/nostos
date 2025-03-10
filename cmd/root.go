@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,10 +38,10 @@ func initConfig() {
 		}
 		cfgFile = filepath.Join(home, ".kube", "config")
 	}
-
-	// Tell Viper which file to read.
+	// Bind the flag value explicitly to Viper so that viper.GetString("kubeconfig") works.
+	viper.Set("kubeconfig", cfgFile)
 	viper.SetConfigFile(cfgFile)
-	// If there's no file extension, explicitly set the config type to YAML.
+	// If there's no extension, set config type to YAML.
 	if filepath.Ext(cfgFile) == "" {
 		viper.SetConfigType("yaml")
 	}
@@ -58,11 +59,11 @@ func initConfig() {
 }
 
 // GetClientConfig builds a Kubernetes REST configuration using the kubeconfig path
-// provided via Viper (either default or overridden by the --kubeconfig flag).
+// provided via Viper.
 func GetClientConfig() (*rest.Config, error) {
-	// Get the kubeconfig path from Viper.
+	// Retrieve kubeconfig from Viper.
 	kubeconfigPath := viper.GetString("kubeconfig")
-	// Build the config from flags. Passing an empty master URL will let the function use the kubeconfig.
+	// Build the config from flags. The empty master URL tells it to use the kubeconfig.
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build kubeconfig: %w", err)
@@ -72,6 +73,9 @@ func GetClientConfig() (*rest.Config, error) {
 
 // Execute runs the root command.
 func Execute() {
+	// Bind the kubeconfig flag to Viper.
+	viper.BindPFlag("kubeconfig", RootCmd.PersistentFlags().Lookup("kubeconfig"))
+
 	if err := RootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -79,9 +83,10 @@ func Execute() {
 }
 
 func init() {
-	// Initialize configuration when any command is executed.
+	// Ensure configuration is initialized on command execution.
 	cobra.OnInitialize(initConfig)
-
-	// Add a persistent flag for specifying kubeconfig.
+	// Add persistent flag for kubeconfig.
 	RootCmd.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", "", "path to the kubeconfig file (default is $HOME/.kube/config)")
+	// Also parse standard flags (required for klog/client-go logging adjustments).
+	flag.Parse()
 }
