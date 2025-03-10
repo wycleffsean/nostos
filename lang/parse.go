@@ -31,6 +31,7 @@ package lang
 
 import (
 	"errors"
+	"log"
 	"strings"
 )
 
@@ -40,15 +41,16 @@ import (
 type pos int
 
 type parser struct {
-	peeked *item
-	tokens chan item
-	nodes  chan *node
+	current *item
+	peeked  *item
+	tokens  chan item
+	nodes   chan node
 }
 
 func NewParser(tokens chan item) *parser {
 	return &parser{
 		tokens: tokens,
-		nodes:  make(chan *node),
+		nodes:  make(chan node),
 	}
 }
 
@@ -173,17 +175,16 @@ func (g *CommentGroup) Text() string {
 
 // -----------------------------------------------------
 // Strings
-//
 type String struct {
 	Position pos
-	Text string
+	Text     string
 }
 
 func (s *String) Pos() pos { return s.Position }
 func (s *String) End() pos { return pos(int(s.Position) + len(s.Text)) }
 
-type parseFn func(*parser) (*node, error)
-type infixFn func(*parser, *node) (*node, error)
+type parseFn func(*parser) (node, error)
+type infixFn func(*parser, node) (node, error)
 type tokenMapping struct {
 	Precedence
 	parseFn
@@ -199,32 +200,36 @@ func init() {
 	tokenMap = make(map[itemType]tokenMapping)
 	tokenMap[itemError] = tokenMapping{precedenceCall, nullDenotationUnhandled, leftDenotationUnhandled}
 	tokenMap[itemColon] = tokenMapping{precedenceCall, nullDenotationUnhandled, mapping}
+	tokenMap[itemString] = tokenMapping{precedenceLowest, _string, leftDenotationUnhandled}
 }
 
-func nullDenotationUnhandled(_ *parser) (*node, error) {
+func nullDenotationUnhandled(_ *parser) (node, error) {
 	return nil, errors.New("unhandled denotation reached")
 }
 
-func leftDenotationUnhandled(_ *parser, _ *node) (*node, error) {
+func leftDenotationUnhandled(_ *parser, _ node) (node, error) {
 	return nil, errors.New("unhandled left denotation")
 }
 
-func (self *parser) Parse() chan *node {
+func (self *parser) Parse() chan node {
 	go self.parseRun()
 	return self.nodes
 }
 
 func (self *parser) parseRun() {
-	for self.peek() != nil {
+	for !self.isEOF() {
 		res, err := self.parseExpression(precedenceLowest)
 		if err != nil {
-			// TODO: do something
-			break
+			log.Fatalf("Parse error: %v\n current token: %v\n next token: %v", err, self.current, self.peek())
 		}
 		self.nodes <- res
 
 	}
-	close(self.tokens) // No more tokens will be delivered
+	// close(self.tokens) // No more tokens will be delivered
+}
+
+func (self *parser) isEOF() bool {
+	return self.peek().typ == itemEOF
 }
 
 func (self *parser) peek() *item {
@@ -237,8 +242,15 @@ func (self *parser) peek() *item {
 	}
 }
 
-func (self *parser) parseExpression(precedence Precedence) (*node, error) {
-	token := self.peek()
+func (self *parser) accept() *item {
+	peeked := self.peek()
+	self.peeked = nil
+	self.current = peeked
+	return peeked
+}
+
+func (self *parser) parseExpression(precedence Precedence) (node, error) {
+	token := self.accept()
 	if token == nil {
 		return nil, errors.New("TODO: Unexpected end of stream")
 	}
@@ -248,7 +260,7 @@ func (self *parser) parseExpression(precedence Precedence) (*node, error) {
 		return nil, err
 	}
 	for precedence < mapping.Precedence {
-		token = self.peek()
+		token = self.accept()
 		if token == nil {
 			return nil, errors.New("TODO: Unexpected end of stream")
 		}
@@ -261,6 +273,10 @@ func (self *parser) parseExpression(precedence Precedence) (*node, error) {
 	return lhs, nil
 }
 
-func mapping(_ *parser, _ *node) (*node, error) {
+func _string(self *parser) (node, error) {
+	return &String{0, self.current.val}, nil
+}
+
+func mapping(_ *parser, _ node) (node, error) {
 	return nil, errors.New("unhandled left denotation")
 }
