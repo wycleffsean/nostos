@@ -43,10 +43,13 @@ import (
 type pos int
 
 type parser struct {
-	current *item
-	peeked  *item
-	tokens  chan item
-	nodes   chan node
+	current       *item
+	peeked        *item
+	currentIndent uint
+	priorIndent   uint
+	priorNode     node
+	tokens        chan item
+	nodes         chan node
 }
 
 func NewParser(tokens chan item) *parser {
@@ -296,7 +299,17 @@ func (self *parser) peekPrecedence() Precedence {
 	return mapping.Precedence
 }
 
+func (self *parser) slurpIndents() {
+	for self.peek().typ == itemIndent {
+		self.accept()
+		self.currentIndent += 1
+	}
+}
+
 func (self *parser) parseExpression(precedence Precedence) (node, error) {
+	priorIndent := self.currentIndent
+	self.slurpIndents()
+
 	token := self.accept()
 	if token == nil {
 		return nil, errors.New("TODO: Unexpected end of stream")
@@ -320,6 +333,16 @@ func (self *parser) parseExpression(precedence Precedence) (node, error) {
 			return nil, err
 		}
 	}
+
+	// We save values for indent
+	// and prior nodes because some expressions
+	// are siblings that need to be bound to
+	// one another
+	// e.g. successive key value pairs with like
+	// indentation form map literals
+	self.priorIndent = self.currentIndent
+	self.priorNode = lhs
+	self.currentIndent = priorIndent
 	return lhs, nil
 }
 
@@ -332,7 +355,17 @@ func symbol(self *parser) (node, error) {
 }
 
 func _map(self *parser, key node) (node, error) {
-	var m Map = make(map[Symbol]node)
+	var m Map
+
+	priorMap, last_node_was_map := self.priorNode.(*Map)
+
+	if self.currentIndent == self.priorIndent && last_node_was_map {
+		// continue building existing map
+		m = *priorMap
+	} else {
+		m = make(map[Symbol]node)
+	}
+
 	value, err := self.parseExpression(precedenceEquality)
 	if err != nil {
 		return nil, err

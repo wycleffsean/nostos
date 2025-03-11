@@ -75,3 +75,51 @@ func TestParseYamlSimpleMap(t *testing.T) {
 	}
 }
 
+func TestParseYamlMap(t *testing.T) {
+	nodes := parseString(`
+  foo: "bar"
+  baz: "bar"
+    	`)
+	got := <-nodes
+
+	foo := Symbol{0, "foo"}
+	bar := Symbol{0, "baz"}
+	var wanted Map = make(map[Symbol]node)
+	value := &String{0, "bar"}
+	wanted[foo] = value
+	wanted[bar] = value
+
+	if m, ok := got.(*Map); ok {
+		if !reflect.DeepEqual(*m, wanted) {
+			t.Errorf("maps aren't equal - expected: %v got: %v", wanted, *m)
+		}
+	} else {
+		t.Errorf("can't cast to Map: %v", got)
+	}
+}
+
+func TestParseYamlNestedMaps(t *testing.T) {
+	nodes := parseString(`
+  foo: "bar"
+  baz:
+    foo: "bar"
+    	`)
+	got := <-nodes
+
+	foo := Symbol{0, "foo"}
+	baz := Symbol{0, "baz"}
+	var wanted Map = make(map[Symbol]node)
+	var child Map = make(map[Symbol]node)
+	bar := &String{0, "bar"}
+	wanted[foo] = bar
+	wanted[baz] = &child
+	child[foo] = bar
+
+	if m, ok := got.(*Map); ok {
+		if !reflect.DeepEqual(*m, wanted) {
+			t.Errorf("maps aren't equal - expected: %v got: %v", wanted, *m)
+		}
+	} else {
+		t.Errorf("can't cast to Map: %v", got)
+	}
+}
