@@ -10,13 +10,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 )
 
 // FetchAllResources retrieves all resources available in the cluster.
 // It returns a map keyed by GroupVersionResource with a slice of unstructured objects.
-func FetchAllResources(config *rest.Config) (map[schema.GroupVersionResource][]*unstructured.Unstructured, error) {
+func FetchAllResources(config *ClientConfig) (map[schema.GroupVersionResource][]*unstructured.Unstructured, error) {
 	// Create a discovery client.
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {

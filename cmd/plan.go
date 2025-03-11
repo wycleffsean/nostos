@@ -5,8 +5,20 @@ import (
 	"log"
 
 	"github.com/spf13/cobra"
+	"github.com/wycleffsean/nostos/pkg/cluster"
 	"github.com/wycleffsean/nostos/pkg/planner"
+	"github.com/wycleffsean/nostos/pkg/registry"
 )
+
+func prepareTypeRegistry(config *cluster.ClientConfig) (*registry.TypeRegistry, error) {
+	registry := registry.NewTypeRegistry()
+	err := registry.AppendRegistryFromCRDs(config)
+	if err != nil {
+		return registry, err
+	}
+
+	return registry, nil
+}
 
 // planCmd represents the plan command.
 var planCmd = &cobra.Command{
@@ -19,6 +31,16 @@ var planCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("No kubeconfig ¯\\_(ツ)_/¯: %v", err)
 		}
+
+		registry, err := prepareTypeRegistry(config)
+		if err != nil {
+			log.Fatalf("fetching types failed: %v", err)
+		}
+
+		registry.Types.Range(func(key, value any) bool {
+			fmt.Printf("key: %v\n", key)
+			return true
+		})
 
 		// Build the plan from the cluster state.
 		plan, err := planner.BuildPlanFromCluster(config)

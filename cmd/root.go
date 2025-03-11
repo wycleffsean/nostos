@@ -8,8 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/wycleffsean/nostos/pkg/cluster"
 )
 
 var kubeconfig string
@@ -60,7 +61,7 @@ func initConfig() {
 
 // GetClientConfig builds a Kubernetes REST configuration using the kubeconfig path
 // provided via Viper.
-func GetClientConfig() (*rest.Config, error) {
+func GetClientConfig() (*cluster.ClientConfig, error) {
 	// Retrieve kubeconfig from Viper.
 	kubeconfigPath := viper.GetString("kubeconfig")
 	// Build the config from flags. The empty master URL tells it to use the kubeconfig.
