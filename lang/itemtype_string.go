@@ -18,11 +18,12 @@ func _() {
 	_ = x[itemColon-7]
 	_ = x[itemNumber-8]
 	_ = x[itemString-9]
+	_ = x[itemSymbol-10]
 }
 
-const _itemType_name = "itemErroritemDotitemDocStartitemDocEnditemEOFitemIndentitemListitemColonitemNumberitemString"
+const _itemType_name = "itemErroritemDotitemDocStartitemDocEnditemEOFitemIndentitemListitemColonitemNumberitemStringitemSymbol"
 
-var _itemType_index = [...]uint8{0, 9, 16, 28, 38, 45, 55, 63, 72, 82, 92}
+var _itemType_index = [...]uint8{0, 9, 16, 28, 38, 45, 55, 63, 72, 82, 92, 102}
 
 func (i itemType) String() string {
 	if i < 0 || i >= itemType(len(_itemType_index)-1) {

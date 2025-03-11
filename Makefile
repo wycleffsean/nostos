@@ -11,7 +11,7 @@ plan: bin/nostos
 	$< plan
 
 # requires go install golang.org/x/tools/cmd/stringer
-lang/itemtype_string.go:
+lang/itemtype_string.go: lang/lex.go
 	go generate ./lang
 
 test: lang/itemtype_string.go

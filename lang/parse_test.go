@@ -1,6 +1,7 @@
 package lang
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -56,7 +57,21 @@ func TestParseString(t *testing.T) {
 
 //// Yaml
 
-func TestYamlMap(t *testing.T) {
-	// _, items := NewStringLexer("yo")
-	// assertScalar(t, got, item{itemString, "yo"})
+func TestParseYamlSimpleMap(t *testing.T) {
+	nodes := parseString(`foo: "bar"`)
+	got := <-nodes
+
+	key := Symbol{0, "foo"}
+	var wanted Map = make(map[Symbol]node)
+	value := &String{0, "bar"}
+	wanted[key] = value
+
+	if m, ok := got.(*Map); ok {
+		if !reflect.DeepEqual(*m, wanted) {
+			t.Errorf("maps aren't equal")
+		}
+	} else {
+		t.Errorf("can't cast to Map: %v", got)
+	}
 }
+

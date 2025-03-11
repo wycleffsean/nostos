@@ -31,7 +31,9 @@ package lang
 
 import (
 	"errors"
+	"fmt"
 	"log"
+	"math"
 	"strings"
 )
 
@@ -183,6 +185,41 @@ type String struct {
 func (s *String) Pos() pos { return s.Position }
 func (s *String) End() pos { return pos(int(s.Position) + len(s.Text)) }
 
+// -----------------------------------------------------
+// Symbol
+type Symbol struct {
+	Position pos
+	Text     string
+}
+
+func (s *Symbol) Pos() pos { return s.Position }
+func (s *Symbol) End() pos { return pos(int(s.Position) + len(s.Text)) }
+
+// -----------------------------------------------------
+// Map - dictionary/hash/associative array
+type Map map[Symbol]node
+
+// These functions have really terrible O(...) performance
+func (m *Map) Pos() pos {
+	var pos pos = 0
+	for symbol, _ := range *m {
+		if pos < symbol.Pos() {
+			pos = symbol.Pos()
+		}
+	}
+	return pos
+
+}
+func (m *Map) End() pos {
+	var pos pos = math.MaxInt32
+	for _, value := range *m {
+		if pos < value.End() {
+			pos = value.End()
+		}
+	}
+	return pos
+}
+
 type parseFn func(*parser) (node, error)
 type infixFn func(*parser, node) (node, error)
 type tokenMapping struct {
@@ -199,16 +236,17 @@ var tokenMap map[itemType]tokenMapping
 func init() {
 	tokenMap = make(map[itemType]tokenMapping)
 	tokenMap[itemError] = tokenMapping{precedenceCall, nullDenotationUnhandled, leftDenotationUnhandled}
-	tokenMap[itemColon] = tokenMapping{precedenceCall, nullDenotationUnhandled, mapping}
+	tokenMap[itemColon] = tokenMapping{precedenceCall, nullDenotationUnhandled, _map}
 	tokenMap[itemString] = tokenMapping{precedenceLowest, _string, leftDenotationUnhandled}
+	tokenMap[itemSymbol] = tokenMapping{precedenceLowest, symbol, leftDenotationUnhandled}
 }
 
-func nullDenotationUnhandled(_ *parser) (node, error) {
-	return nil, errors.New("unhandled denotation reached")
+func nullDenotationUnhandled(self *parser) (node, error) {
+	return nil, errors.New(fmt.Sprintf("unhandled null denotation reached for '%v'", self.current.typ))
 }
 
-func leftDenotationUnhandled(_ *parser, _ node) (node, error) {
-	return nil, errors.New("unhandled left denotation")
+func leftDenotationUnhandled(self *parser, _ node) (node, error) {
+	return nil, errors.New(fmt.Sprintf("unhandled left denotation reached for '%v'", self.current.typ))
 }
 
 func (self *parser) Parse() chan node {
@@ -249,17 +287,29 @@ func (self *parser) accept() *item {
 	return peeked
 }
 
+func (self *parser) peekPrecedence() Precedence {
+	token := self.peek()
+	mapping, ok := tokenMap[token.typ]
+	if !ok {
+		return -1 // we've probably hit EOF
+	}
+	return mapping.Precedence
+}
+
 func (self *parser) parseExpression(precedence Precedence) (node, error) {
 	token := self.accept()
 	if token == nil {
 		return nil, errors.New("TODO: Unexpected end of stream")
 	}
-	mapping := tokenMap[token.typ]
+	mapping, ok := tokenMap[token.typ]
+	if !ok {
+		return nil, errors.New(fmt.Sprintf("missing parser production for '%v'", token.typ))
+	}
 	lhs, err := mapping.parseFn(self)
 	if err != nil {
 		return nil, err
 	}
-	for precedence < mapping.Precedence {
+	for precedence < self.peekPrecedence() {
 		token = self.accept()
 		if token == nil {
 			return nil, errors.New("TODO: Unexpected end of stream")
@@ -277,6 +327,16 @@ func _string(self *parser) (node, error) {
 	return &String{0, self.current.val}, nil
 }
 
-func mapping(_ *parser, _ node) (node, error) {
-	return nil, errors.New("unhandled left denotation")
+func symbol(self *parser) (node, error) {
+	return &Symbol{0, self.current.val}, nil
+}
+
+func _map(self *parser, key node) (node, error) {
+	var m Map = make(map[Symbol]node)
+	value, err := self.parseExpression(precedenceEquality)
+	if err != nil {
+		return nil, err
+	}
+	m[*key.(*Symbol)] = value
+	return &m, nil
 }
