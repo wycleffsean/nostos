@@ -17,6 +17,9 @@ lang/itemtype_string.go:
 test: lang/itemtype_string.go
 	go test -v ./...
 
+watch: lang/itemtype_string.go
+	ls **/*.go | entr -c $(MAKE) test
+
 # Run the linter (if you add one, e.g., golangci-lint)
 lint:
 	golangci-lint run
