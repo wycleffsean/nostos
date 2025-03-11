@@ -31,6 +31,7 @@ const (
 	// itemRawString
 	// itemRightMeta
 	itemString
+	itemSymbol
 	// itemText
 )
 
@@ -182,7 +183,10 @@ func lexInDocument(l *lexer) stateFn {
 		if isNumber(l.peek()) {
 			return lexNumber
 		}
-		return lexString
+		if l.peek() == '"' {
+			return lexString
+		}
+		return lexSymbol
 	}
 }
 
@@ -214,34 +218,33 @@ func lexList(l *lexer) stateFn {
 	return lexInDocument
 }
 
-func lexNonSpacedString(l *lexer) {
+func lexSymbol(l *lexer) stateFn {
 	// unquoted strings
 	for isValidKey(l.peek()) {
 		l.next()
 	}
-	l.emit(itemString)
+	l.emit(itemSymbol)
+	return lexInDocument
 }
 
 func lexString(l *lexer) stateFn {
-	if l.next() == '"' {
-		// quoted strings
-		l.ignore() // skip quote
-		for {
-			r := l.peek()
-			if r == 0 {
-				l.ignore()
-				return l.errorf("EOF reached in unterminated string")
-			} else if r == '"' && l.input[l.pos-1] != '\\' {
-				break
-			}
-			l.next()
-		}
-		l.emit(itemString)
-		l.next() // consume and skip double quote
-		l.ignore()
-	} else {
-		lexNonSpacedString(l)
+	if l.next() != '"' {
+		return l.errorf("Strings must be quoted")
 	}
+	l.ignore() // skip quote
+	for {
+		r := l.peek()
+		if r == 0 {
+			l.ignore()
+			return l.errorf("EOF reached in unterminated string")
+		} else if r == '"' && l.input[l.pos-1] != '\\' {
+			break
+		}
+		l.next()
+	}
+	l.emit(itemString)
+	l.next() // consume and skip double quote
+	l.ignore()
 	return lexInDocument
 }
 
