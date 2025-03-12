@@ -218,6 +218,7 @@ func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[st
 		Version: version,
 		Kind:    kind,
 		Scope:   scope,
+		Description: schemaObj["description"].(string),
 		Fields:  []types.FieldDefinition{},
 	}
 	// Only proceed if the schema has defined properties (i.e., it's an object schema)
@@ -260,6 +261,7 @@ func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[st
 				}
 			}
 			fieldDef.Type = "object"
+			fieldDef.Description = getStringField(propSchema, "description")
 			fieldDef.SubFields = subFields
 		} else if fieldType == "array" {
 			// If the field is an array, determine the element type
@@ -278,9 +280,11 @@ func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[st
 		} else if fieldType != "" {
 			// Primitive type (string, integer, boolean, etc.)
 			fieldDef.Type = fieldType
+			fieldDef.Description = getStringField(propSchema, "description")
 		} else {
 			// Fallback if type is unspecified
 			fieldDef.Type = "any"
+			fieldDef.Description = getStringField(propSchema, "description")
 		}
 		td.Fields = append(td.Fields, fieldDef)
 	}
