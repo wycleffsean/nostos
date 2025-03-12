@@ -1,4 +1,4 @@
-package cluster
+package kube
 
 import (
 	"context"
@@ -15,7 +15,11 @@ import (
 
 // FetchAllResources retrieves all resources available in the cluster.
 // It returns a map keyed by GroupVersionResource with a slice of unstructured objects.
-func FetchAllResources(config *ClientConfig) (map[schema.GroupVersionResource][]*unstructured.Unstructured, error) {
+func FetchAllResources() (map[schema.GroupVersionResource][]*unstructured.Unstructured, error) {
+	config, err := LoadKubeConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes client config: %w", err)
+	}
 	// Create a discovery client.
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {

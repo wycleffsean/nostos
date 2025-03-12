@@ -20,3 +20,23 @@ Helm does pre and post hooks.  It stores the release states in the cluster
 - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.31/
 - https://tamerlan.dev/how-to-build-a-language-server-with-go/
 - https://github.com/tliron/glsp
+
+# CLI
+The CLI honors `kubectl` options where possible
+
+```
+# Fetch types using default kubeconfig (~/.kube/config)
+nostos fetch
+
+# Fetch types using environment variable
+KUBECONFIG=/path/to/kubeconfig nostos fetch
+
+# Fetch using an explicit kubeconfig file
+nostos fetch --kubeconfig=/path/to/kubeconfig
+
+# Fetch from a specific context
+nostos fetch --context=my-cluster
+
+# Fetch inside a Kubernetes pod (automatically uses in-cluster config)
+kubectl run nostos --image=nostos:latest -- fetch
+```

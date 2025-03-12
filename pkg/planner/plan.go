@@ -4,9 +4,8 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/rest"
 
-	"github.com/wycleffsean/nostos/pkg/cluster"
+	"github.com/wycleffsean/nostos/pkg/kube"
 )
 
 // ResourceType represents an internal abstraction of a Kubernetes resource.
@@ -23,8 +22,8 @@ type Plan struct {
 }
 
 // BuildPlanFromCluster fetches all resources from the cluster and converts them into internal ResourceType representations.
-func BuildPlanFromCluster(config *rest.Config) (*Plan, error) {
-	clusterResources, err := cluster.FetchAllResources(config)
+func BuildPlanFromCluster() (*Plan, error) {
+	clusterResources, err := kube.FetchAllResources()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cluster resources: %w", err)
 	}

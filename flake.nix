@@ -15,6 +15,8 @@
       buildInputs = with pkgs; [
         entr
         go
+        jq
+        kubectl # pretty useful -> kubectl get --raw /openapi/v2 | jq '.definitions."io.k8s.api.core.v1.Pod"'
       ];
 
       shellHook = ''
