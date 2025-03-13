@@ -214,12 +214,12 @@ func extractDefinitions(specMap map[string]interface{}) (map[string]interface{},
 // It extracts top-level fields and their types, including one level of nested fields for object types.
 func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[string]interface{}) types.TypeDefinition {
 	td := types.TypeDefinition{
-		Group:   group,
-		Version: version,
-		Kind:    kind,
-		Scope:   scope,
+		Group:       group,
+		Version:     version,
+		Kind:        kind,
+		Scope:       scope,
 		Description: schemaObj["description"].(string),
-		Fields:  []types.FieldDefinition{},
+		Fields:      []types.FieldDefinition{},
 	}
 	// Only proceed if the schema has defined properties (i.e., it's an object schema)
 	properties, ok := schemaObj["properties"].(map[string]interface{})
