@@ -36,8 +36,20 @@ const (
 )
 
 type item struct {
-	typ itemType // Type, such as itemNumber
-	val string   // Value, such as "23.2"
+	typ      itemType // Type, such as itemNumber
+	val      string   // Value, such as "23.2"
+	position Position
+}
+
+type Position struct {
+	// For slices
+	ByteOffset uint
+	ByteLength uint
+
+	// For LSP
+	// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#position
+	LineNumber      uint `json:"line"`
+	CharacterOffset uint `json:"character"`
 }
 
 func (i item) String() string {
@@ -56,11 +68,14 @@ func (i item) String() string {
 // holds the state of the scanner
 type lexer struct {
 	// TODO: input should be a (buffered) reader
-	input string    // the string being scanned
-	start int       // start position of this item
-	pos   int       // current position in the input
-	width int       // width of last rune read
-	items chan item // channel of scanned items
+	input         string    // the string being scanned
+	start         uint      // start position of this item
+	pos           uint      // current position in the input
+	currentLine   uint      // 0 indexed count of newline characters seen
+	offset        uint      // 0 indexed count of character offset - corresponds to LSP spec PositionEncodingKind
+	currentOffset uint      // counter for offset
+	width         uint      // width of last rune read
+	items         chan item // channel of scanned items
 }
 
 type stateFn func(*lexer) stateFn
@@ -81,19 +96,32 @@ func (l *lexer) run() {
 	close(l.items) // No more tokens will be delivered
 }
 
+// Sometimes we want the lex token and the offset to be different
+// e.g. strings - a token will carry the contents of the string,
+//
+//	but the offset will begin at the quote (they are off by 1)
+func (l *lexer) markOffset() {
+	l.offset = l.currentOffset
+}
+
 func (l *lexer) emit(t itemType) {
-	l.items <- item{t, l.input[l.start:l.pos]}
+	position := Position{l.start, l.pos - l.start, l.currentLine, l.offset}
+	l.items <- item{t, l.input[l.start:l.pos], position}
+	l.markOffset()
 	l.start = l.pos
 }
 
 func (l *lexer) next() rune {
-	if l.pos >= len(l.input) {
+	if l.pos >= uint(len(l.input)) {
 		l.width = 0
 		return 0
 	}
 	var r rune
-	r, l.width =
+	var runeWidth int
+	r, runeWidth =
 		utf8.DecodeRuneInString(l.input[l.pos:])
+	l.width = uint(runeWidth)
+	l.currentOffset += 1
 	l.pos += l.width
 	return r
 }
@@ -107,6 +135,7 @@ func (l *lexer) ignore() {
 // Can be called only once per call of next
 func (l *lexer) backup() {
 	l.pos -= l.width
+	l.currentOffset -= 1
 }
 
 // peek returns but does not consume the
@@ -135,10 +164,8 @@ func (l *lexer) acceptRun(valid string) {
 }
 
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
-	l.items <- item{
-		itemError,
-		fmt.Sprintf(format, args...),
-	}
+	position := Position{l.start, l.pos - l.start, l.currentLine, l.currentOffset}
+	l.items <- item{itemError, fmt.Sprintf(format, args...), position}
 	return nil
 }
 
@@ -195,6 +222,9 @@ func lexIndent(l *lexer) stateFn {
 	if l.peek() == '\n' {
 		l.next()
 		l.ignore()
+		l.currentLine += 1
+		l.currentOffset = 0
+		l.markOffset()
 	}
 	if l.peek() == ' ' {
 		l.next()
@@ -228,6 +258,7 @@ func lexSymbol(l *lexer) stateFn {
 }
 
 func lexString(l *lexer) stateFn {
+	l.markOffset() // "character offset" for LSP will begin at double quote
 	if l.next() != '"' {
 		return l.errorf("Strings must be quoted")
 	}
