@@ -30,7 +30,6 @@ package lang
 // func (*EmptyStmt) stmtNode()      {}
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -85,6 +84,32 @@ type binaryOpNode interface {
 	node
 	leftExpr() node
 	rightExpr() node
+}
+
+type errorNode interface {
+	node
+	Error() string
+}
+
+// -----------------------------------------------------
+// Errors
+//
+// We attempt to recover from parsing errors by turning
+// parse errors into nodes. This hopefully enables
+// LSP capabilities, and reporting all parse errors in
+// a document instead of just the first
+type ParseError struct {
+	Message string
+	Token   *item
+}
+
+func (e *ParseError) Pos() pos { return pos(e.Token.position.ByteOffset) }
+func (e *ParseError) End() pos { return pos(e.Token.position.ByteOffset + e.Token.position.ByteLength) }
+func (e *ParseError) Error() string {
+	line := e.Token.position.LineNumber
+	offset := e.Token.position.CharacterOffset
+	tokenString := e.Token.val
+	return fmt.Sprintf("ParseError:%d:%d '%s' - %s", line, offset, tokenString, e.Message)
 }
 
 // -----------------------------------------------------
@@ -223,8 +248,8 @@ func (m *Map) End() pos {
 	return pos
 }
 
-type parseFn func(*parser) (node, error)
-type infixFn func(*parser, node) (node, error)
+type parseFn func(*parser) node
+type infixFn func(*parser, node) node
 type tokenMapping struct {
 	Precedence
 	parseFn
@@ -244,12 +269,16 @@ func init() {
 	tokenMap[itemSymbol] = tokenMapping{precedenceLowest, symbol, leftDenotationUnhandled}
 }
 
-func nullDenotationUnhandled(self *parser) (node, error) {
-	return nil, errors.New(fmt.Sprintf("unhandled null denotation reached for '%v'", self.current.typ))
+func (self *parser) _error(message string) node {
+	return &ParseError{message, self.current}
 }
 
-func leftDenotationUnhandled(self *parser, _ node) (node, error) {
-	return nil, errors.New(fmt.Sprintf("unhandled left denotation reached for '%v'", self.current.typ))
+func nullDenotationUnhandled(self *parser) node {
+	return self._error(fmt.Sprintf("unhandled null denotation reached for '%v'", self.current.typ))
+}
+
+func leftDenotationUnhandled(self *parser, _ node) node {
+	return self._error(fmt.Sprintf("unhandled left denotation reached for '%v'", self.current.typ))
 }
 
 func (self *parser) Parse() chan node {
@@ -259,8 +288,8 @@ func (self *parser) Parse() chan node {
 
 func (self *parser) parseRun() {
 	for !self.isEOF() {
-		res, err := self.parseExpression(precedenceLowest)
-		if err != nil {
+		res := self.parseExpression(precedenceLowest)
+		if err, ok := res.(errorNode); ok {
 			log.Fatalf("Parse error: %v\n current token: %v\n next token: %v", err, self.current, self.peek())
 		}
 		self.nodes <- res
@@ -306,31 +335,31 @@ func (self *parser) slurpIndents() {
 	}
 }
 
-func (self *parser) parseExpression(precedence Precedence) (node, error) {
+func (self *parser) parseExpression(precedence Precedence) node {
 	priorIndent := self.currentIndent
 	self.slurpIndents()
 
 	token := self.accept()
 	if token == nil {
-		return nil, errors.New("TODO: Unexpected end of stream")
+		return self._error("TODO: Unexpected end of stream")
 	}
 	mapping, ok := tokenMap[token.typ]
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("missing parser production for '%v'", token.typ))
+		return self._error(fmt.Sprintf("missing parser production for '%v'", token.typ))
 	}
-	lhs, err := mapping.parseFn(self)
-	if err != nil {
-		return nil, err
+	lhs := mapping.parseFn(self)
+	if err, ok := lhs.(errorNode); ok {
+		return err
 	}
 	for precedence < self.peekPrecedence() {
 		token = self.accept()
 		if token == nil {
-			return nil, errors.New("TODO: Unexpected end of stream")
+			return self._error("TODO: Unexpected end of stream")
 		}
 		mapping := tokenMap[token.typ]
-		lhs, err = mapping.infixFn(self, lhs)
-		if err != nil {
-			return nil, err
+		lhs = mapping.infixFn(self, lhs)
+		if err, ok := lhs.(errorNode); ok {
+			return err
 		}
 	}
 
@@ -343,18 +372,18 @@ func (self *parser) parseExpression(precedence Precedence) (node, error) {
 	self.priorIndent = self.currentIndent
 	self.priorNode = lhs
 	self.currentIndent = priorIndent
-	return lhs, nil
+	return lhs
 }
 
-func _string(self *parser) (node, error) {
-	return &String{0, self.current.val}, nil
+func _string(self *parser) node {
+	return &String{0, self.current.val}
 }
 
-func symbol(self *parser) (node, error) {
-	return &Symbol{0, self.current.val}, nil
+func symbol(self *parser) node {
+	return &Symbol{0, self.current.val}
 }
 
-func _map(self *parser, key node) (node, error) {
+func _map(self *parser, key node) node {
 	var m Map
 
 	priorMap, last_node_was_map := self.priorNode.(*Map)
@@ -366,10 +395,10 @@ func _map(self *parser, key node) (node, error) {
 		m = make(map[Symbol]node)
 	}
 
-	value, err := self.parseExpression(precedenceEquality)
-	if err != nil {
-		return nil, err
+	value := self.parseExpression(precedenceEquality)
+	if err, ok := value.(errorNode); ok {
+		return err
 	}
 	m[*key.(*Symbol)] = value
-	return &m, nil
+	return &m
 }
