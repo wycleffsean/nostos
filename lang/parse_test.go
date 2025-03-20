@@ -32,7 +32,7 @@ func TestCommentText(t *testing.T) {
 	}
 }
 
-func parseString(input string) chan node {
+func parseString(input string) node {
 	_, items := NewStringLexer(input)
 	parser := NewParser(items)
 	return parser.Parse()
@@ -42,8 +42,7 @@ func parseString(input string) chan node {
 
 // // Scalars
 func TestParseString(t *testing.T) {
-	nodes := parseString("\"yo\"")
-	got := <-nodes
+	got:= parseString("\"yo\"")
 	// assertScalar(t, got, node{})
 	wanted := String{0, "yo"}
 	if str, ok := got.(*String); ok {
@@ -58,8 +57,7 @@ func TestParseString(t *testing.T) {
 //// Yaml
 
 func TestParseYamlSimpleMap(t *testing.T) {
-	nodes := parseString(`foo: "bar"`)
-	got := <-nodes
+	got := parseString(`foo: "bar"`)
 
 	key := Symbol{0, "foo"}
 	var wanted Map = make(map[Symbol]node)
@@ -76,11 +74,10 @@ func TestParseYamlSimpleMap(t *testing.T) {
 }
 
 func TestParseYamlMap(t *testing.T) {
-	nodes := parseString(`
+	got:= parseString(`
   foo: "bar"
   baz: "bar"
     	`)
-	got := <-nodes
 
 	foo := Symbol{0, "foo"}
 	bar := Symbol{0, "baz"}
@@ -99,12 +96,11 @@ func TestParseYamlMap(t *testing.T) {
 }
 
 func TestParseYamlNestedMaps(t *testing.T) {
-	nodes := parseString(`
+	got := parseString(`
   foo: "bar"
   baz:
     foo: "bar"
     	`)
-	got := <-nodes
 
 	foo := Symbol{0, "foo"}
 	baz := Symbol{0, "baz"}

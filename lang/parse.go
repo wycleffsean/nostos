@@ -281,9 +281,9 @@ func leftDenotationUnhandled(self *parser, _ node) node {
 	return self._error(fmt.Sprintf("unhandled left denotation reached for '%v'", self.current.typ))
 }
 
-func (self *parser) Parse() chan node {
+func (self *parser) Parse() node {
 	go self.parseRun()
-	return self.nodes
+	return <- self.nodes
 }
 
 func (self *parser) parseRun() {
