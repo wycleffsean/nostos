@@ -32,14 +32,8 @@ package lang
 import (
 	"fmt"
 	"log"
-	"math"
 	"strings"
 )
-
-// TODO: this should come from "item" which should
-// really be renamed "token".  So we'll refactor
-// references to this type as "token.Pos"
-type pos int
 
 type parser struct {
 	current       *item
@@ -71,8 +65,8 @@ const (
 )
 
 type node interface {
-	Pos() pos // position of first character belonging to the node
-	End() pos // position of first character immediately after the node
+	Pos() Position // position of first character belonging to the node
+	// End() Position // position of first character immediately after the node
 }
 
 type unaryOpNode interface {
@@ -103,8 +97,9 @@ type ParseError struct {
 	Token   *item
 }
 
-func (e *ParseError) Pos() pos { return pos(e.Token.position.ByteOffset) }
-func (e *ParseError) End() pos { return pos(e.Token.position.ByteOffset + e.Token.position.ByteLength) }
+func (e *ParseError) Pos() Position { return e.Token.position }
+
+// func (e *ParseError) End() pos { return pos(e.Token.position.ByteOffset + e.Token.position.ByteLength) }
 func (e *ParseError) Error() string {
 	line := e.Token.position.LineNumber
 	offset := e.Token.position.CharacterOffset
@@ -124,12 +119,13 @@ func (e *ParseError) Error() string {
 // [Comment.End] does not match the true source end
 // position for comments containing carriage returns.
 type Comment struct {
-	Hash pos    // position of "#" starting the comment
-	Text string // comment text (excluding '\n')
+	Hash Position // position of "#" starting the comment
+	Text string   // comment text (excluding '\n')
 }
 
-func (c *Comment) Pos() pos { return c.Hash }
-func (c *Comment) End() pos { return pos(int(c.Hash) + len(c.Text)) }
+func (c *Comment) Pos() Position { return c.Hash }
+
+// func (c *Comment) End() pos { return pos(int(c.Hash) + len(c.Text)) }
 
 // A CommentGroup represents a sequence of comments with
 // no other tokens and no empty lines between.
@@ -137,8 +133,9 @@ type CommentGroup struct {
 	List []*Comment // len(List) > 0
 }
 
-func (g *CommentGroup) Pos() pos { return g.List[0].Pos() }
-func (g *CommentGroup) End() pos { return g.List[len(g.List)-1].End() }
+func (g *CommentGroup) Pos() Position { return g.List[0].Pos() }
+
+// func (g *CommentGroup) End() pos { return g.List[len(g.List)-1].End() }
 
 func isWhitespace(ch byte) bool { return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' }
 
@@ -206,47 +203,50 @@ func (g *CommentGroup) Text() string {
 // -----------------------------------------------------
 // Strings
 type String struct {
-	Position pos
+	Position Position
 	Text     string
 }
 
-func (s *String) Pos() pos { return s.Position }
-func (s *String) End() pos { return pos(int(s.Position) + len(s.Text)) }
+func (s *String) Pos() Position { return s.Position }
+
+// func (s *String) End() pos { return pos(int(s.Position) + len(s.Text)) }
 
 // -----------------------------------------------------
 // Symbol
 type Symbol struct {
-	Position pos
+	Position Position
 	Text     string
 }
 
-func (s *Symbol) Pos() pos { return s.Position }
-func (s *Symbol) End() pos { return pos(int(s.Position) + len(s.Text)) }
+func (s *Symbol) Pos() Position { return s.Position }
+
+// func (s *Symbol) End() Position { return pos(int(s.Position) + len(s.Text)) }
 
 // -----------------------------------------------------
 // Map - dictionary/hash/associative array
 type Map map[Symbol]node
 
 // These functions have really terrible O(...) performance
-func (m *Map) Pos() pos {
-	var pos pos = 0
+func (m *Map) Pos() Position {
+	var pos Position = Position{}
 	for symbol, _ := range *m {
-		if pos < symbol.Pos() {
+		if pos.Less(symbol.Pos()) {
 			pos = symbol.Pos()
 		}
 	}
 	return pos
 
 }
-func (m *Map) End() pos {
-	var pos pos = math.MaxInt32
-	for _, value := range *m {
-		if pos < value.End() {
-			pos = value.End()
-		}
-	}
-	return pos
-}
+
+// func (m *Map) End() pos {
+// 	var pos pos = math.MaxInt32
+// 	for _, value := range *m {
+// 		if pos < value.End() {
+// 			pos = value.End()
+// 		}
+// 	}
+// 	return pos
+// }
 
 type parseFn func(*parser) node
 type infixFn func(*parser, node) node
@@ -283,7 +283,7 @@ func leftDenotationUnhandled(self *parser, _ node) node {
 
 func (self *parser) Parse() node {
 	go self.parseRun()
-	return <- self.nodes
+	return <-self.nodes
 }
 
 func (self *parser) parseRun() {
@@ -376,11 +376,11 @@ func (self *parser) parseExpression(precedence Precedence) node {
 }
 
 func _string(self *parser) node {
-	return &String{0, self.current.val}
+	return &String{Position{}, self.current.val}
 }
 
 func symbol(self *parser) node {
-	return &Symbol{0, self.current.val}
+	return &Symbol{Position{}, self.current.val}
 }
 
 func _map(self *parser, key node) node {

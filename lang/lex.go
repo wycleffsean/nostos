@@ -52,6 +52,16 @@ type Position struct {
 	CharacterOffset uint `json:"character"`
 }
 
+func (self *Position) Less(than Position) bool {
+	if self.LineNumber < than.LineNumber {
+		return true
+	}
+	if self.LineNumber == than.LineNumber {
+		return self.CharacterOffset < than.CharacterOffset
+	}
+	return false
+}
+
 func (i item) String() string {
 	switch i.typ {
 	case itemEOF:

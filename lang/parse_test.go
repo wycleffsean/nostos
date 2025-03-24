@@ -44,7 +44,7 @@ func parseString(input string) node {
 func TestParseString(t *testing.T) {
 	got:= parseString("\"yo\"")
 	// assertScalar(t, got, node{})
-	wanted := String{0, "yo"}
+	wanted := String{Position{}, "yo"}
 	if str, ok := got.(*String); ok {
 		if *str != wanted {
 			t.Errorf("got %q, wanted %q", *str, wanted)
@@ -59,9 +59,9 @@ func TestParseString(t *testing.T) {
 func TestParseYamlSimpleMap(t *testing.T) {
 	got := parseString(`foo: "bar"`)
 
-	key := Symbol{0, "foo"}
+	key := Symbol{Position{}, "foo"}
 	var wanted Map = make(map[Symbol]node)
-	value := &String{0, "bar"}
+	value := &String{Position{}, "bar"}
 	wanted[key] = value
 
 	if m, ok := got.(*Map); ok {
@@ -79,10 +79,10 @@ func TestParseYamlMap(t *testing.T) {
   baz: "bar"
     	`)
 
-	foo := Symbol{0, "foo"}
-	bar := Symbol{0, "baz"}
+	foo := Symbol{Position{}, "foo"}
+	bar := Symbol{Position{}, "baz"}
 	var wanted Map = make(map[Symbol]node)
-	value := &String{0, "bar"}
+	value := &String{Position{}, "bar"}
 	wanted[foo] = value
 	wanted[bar] = value
 
@@ -102,11 +102,11 @@ func TestParseYamlNestedMaps(t *testing.T) {
     foo: "bar"
     	`)
 
-	foo := Symbol{0, "foo"}
-	baz := Symbol{0, "baz"}
+	foo := Symbol{Position{}, "foo"}
+	baz := Symbol{Position{}, "baz"}
 	var wanted Map = make(map[Symbol]node)
 	var child Map = make(map[Symbol]node)
-	bar := &String{0, "bar"}
+	bar := &String{Position{}, "bar"}
 	wanted[foo] = bar
 	wanted[baz] = &child
 	child[foo] = bar

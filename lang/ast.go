@@ -25,3 +25,8 @@ func NewAst(input string, uri uri.URI) Ast {
 
 	return Ast{uri, parsedItem}
 }
+
+func (self *Ast) ExtractSymbols() []*Symbol {
+    symbols := make([]*Symbol, 50)
+    return symbols
+}
