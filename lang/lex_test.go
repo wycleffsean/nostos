@@ -34,17 +34,20 @@ func keyValue(t *testing.T, items chan item) (item, item) {
 	itema := <-items
 	colon := <-items
 	itemb := <-items
-	assertScalar(t, colon, itemColon, ":")
+	assertScalar(t, colon, itemColon, ":", 0)
 	assertChannelClosed(t, items)
 	return itema, itemb
 }
 
-func assertScalar(t *testing.T, got item, wantedType itemType, content string) {
+func assertScalar(t *testing.T, got item, wantedType itemType, content string, indent uint) {
 	if got.typ != wantedType {
 		t.Errorf("got %s, wanted %s", got.typ, wantedType)
 	}
 	if got.val != content {
 		t.Errorf("got %q, wanted %q", got.val, content)
+	}
+	if got.indent != indent {
+		t.Errorf("got indent of %q, wanted %q", got.indent, indent)
 	}
 }
 
@@ -68,81 +71,79 @@ func assertPosition(t *testing.T, got item, value string, byteOffset, byteLength
 
 // Tests
 
-func TestSymbol(t *testing.T) {
+func TestLexSymbol(t *testing.T) {
 	_, items := NewStringLexer("yo")
 	got := single(t, items)
-	assertScalar(t, got, itemSymbol, "yo")
+	assertScalar(t, got, itemSymbol, "yo", 0)
 }
 
-func TestString(t *testing.T) {
+func TestLexString(t *testing.T) {
 	_, items := NewStringLexer(`"yo"`)
 	got := single(t, items)
-	assertScalar(t, got, itemString, "yo")
+	assertScalar(t, got, itemString, "yo", 0)
 }
 
-func TestStringWithSymbols(t *testing.T) {
+func TestLexStringWithSymbols(t *testing.T) {
 	_, items := NewStringLexer(`"apps/v1"`)
 	got := single(t, items)
-	assertScalar(t, got, itemString, "apps/v1")
+	assertScalar(t, got, itemString, "apps/v1", 0)
 }
 
-func TestInteger(t *testing.T) {
+func TestLexInteger(t *testing.T) {
 	_, items := NewStringLexer("123")
 	got := single(t, items)
-	assertScalar(t, got, itemNumber, "123")
+	assertScalar(t, got, itemNumber, "123", 0)
 }
 
-func TestFloat(t *testing.T) {
+func TestLexFloat(t *testing.T) {
 	_, items := NewStringLexer("123.99")
 	got := single(t, items)
-	assertScalar(t, got, itemNumber, "123.99")
+	assertScalar(t, got, itemNumber, "123.99", 0)
 }
 
-func TestList(t *testing.T) {
+func TestLexList(t *testing.T) {
 	_, items := NewStringLexer("- yo")
 	itema, itemb := pair(t, items)
-	assertScalar(t, itema, itemList, "")
-	assertScalar(t, itemb, itemSymbol, "yo")
+	assertScalar(t, itema, itemList, "", 0)
+	assertScalar(t, itemb, itemSymbol, "yo", 0)
 }
 
-func TestMap(t *testing.T) {
+func TestLexMap(t *testing.T) {
 	_, items := NewStringLexer("foo: bar")
 	key, value := keyValue(t, items)
-	assertScalar(t, key, itemSymbol, "foo")
-	assertScalar(t, value, itemSymbol, "bar")
+	assertScalar(t, key, itemSymbol, "foo", 0)
+	assertScalar(t, value, itemSymbol, "bar", 0)
 }
 
 // TODO: Should lexer drop escape backslashes?
-func TestQuotedString(t *testing.T) {
+func TestLexQuotedString(t *testing.T) {
 	_, items := NewStringLexer(`foo: "this is a \"quoted\" string"`)
 	key, value := keyValue(t, items)
-	assertScalar(t, key, itemSymbol, "foo")
-	assertScalar(t, value, itemString, `this is a \"quoted\" string`)
+	assertScalar(t, key, itemSymbol, "foo", 0)
+	assertScalar(t, value, itemString, `this is a \"quoted\" string`, 0)
 }
 
-func TestQuotedStringUnterminated(t *testing.T) {
+func TestLexQuotedStringUnterminated(t *testing.T) {
 	_, items := NewStringLexer(`foo: "unterminated`)
 	key := <-items
 	colon := <-items
 	value := <-items
-	assertScalar(t, key, itemSymbol, "foo")
-	assertScalar(t, colon, itemColon, ":")
-	assertScalar(t, value, itemError, "EOF reached in unterminated string")
+	assertScalar(t, key, itemSymbol, "foo", 0)
+	assertScalar(t, colon, itemColon, ":", 0)
+	assertScalar(t, value, itemError, "EOF reached in unterminated string", 0)
 }
 
-func TestIndent(t *testing.T) {
+func TestLexIndent(t *testing.T) {
 	_, items := NewStringLexer("\n  foo: bar")
-	indent := <-items
 	key := <-items
 	colon := <-items
 	value := <-items
-	assertScalar(t, indent, itemIndent, "  ")
-	assertScalar(t, key, itemSymbol, "foo")
-	assertScalar(t, colon, itemColon, ":")
-	assertScalar(t, value, itemSymbol, "bar")
+	assertScalar(t, key, itemSymbol, "foo", 1)
+	assertScalar(t, colon, itemColon, ":", 1)
+	assertScalar(t, value, itemSymbol, "bar", 1)
 }
 
-func TestManifest(t *testing.T) {
+func TestLexManifest(t *testing.T) {
 	manifest := `
 apiVersion: "apps/v1"
 kind: "Deployment"
@@ -165,59 +166,41 @@ spec:
         - containerPort: 8080
     `
 	_, items := NewStringLexer(manifest)
-	assertScalar(t, <-items, itemSymbol, "apiVersion")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemString, "apps/v1")
-	assertScalar(t, <-items, itemSymbol, "kind")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemString, "Deployment")
-	assertScalar(t, <-items, itemSymbol, "metadata")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemSymbol, "name")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemString, "example-deployment")
-	assertScalar(t, <-items, itemSymbol, "spec")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemSymbol, "replicas")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemNumber, "3")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemSymbol, "selector")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemSymbol, "matchLabels")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemSymbol, "app")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemString, "example")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemSymbol, "template")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemSymbol, "metadata")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemSymbol, "labels")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemIndent, "  ")
-	assertScalar(t, <-items, itemSymbol, "app")
-	assertScalar(t, <-items, itemColon, ":")
-	assertScalar(t, <-items, itemString, "example")
+	assertScalar(t, <-items, itemSymbol, "apiVersion", 0)
+	assertScalar(t, <-items, itemColon, ":", 0)
+	assertScalar(t, <-items, itemString, "apps/v1", 0)
+	assertScalar(t, <-items, itemSymbol, "kind", 0)
+	assertScalar(t, <-items, itemColon, ":", 0)
+	assertScalar(t, <-items, itemString, "Deployment", 0)
+	assertScalar(t, <-items, itemSymbol, "metadata", 0)
+	assertScalar(t, <-items, itemColon, ":", 0)
+	assertScalar(t, <-items, itemSymbol, "name", 1)
+	assertScalar(t, <-items, itemColon, ":", 1)
+	assertScalar(t, <-items, itemString, "example-deployment", 1)
+	assertScalar(t, <-items, itemSymbol, "spec", 0)
+	assertScalar(t, <-items, itemColon, ":", 0)
+	assertScalar(t, <-items, itemSymbol, "replicas", 1)
+	assertScalar(t, <-items, itemColon, ":", 1)
+	assertScalar(t, <-items, itemNumber, "3", 1)
+	assertScalar(t, <-items, itemSymbol, "selector", 1)
+	assertScalar(t, <-items, itemColon, ":", 1)
+	assertScalar(t, <-items, itemSymbol, "matchLabels", 2)
+	assertScalar(t, <-items, itemColon, ":", 2)
+	assertScalar(t, <-items, itemSymbol, "app", 3)
+	assertScalar(t, <-items, itemColon, ":", 3)
+	assertScalar(t, <-items, itemString, "example", 3)
+	assertScalar(t, <-items, itemSymbol, "template", 1)
+	assertScalar(t, <-items, itemColon, ":", 1)
+	assertScalar(t, <-items, itemSymbol, "metadata", 2)
+	assertScalar(t, <-items, itemColon, ":", 2)
+	assertScalar(t, <-items, itemSymbol, "labels", 3)
+	assertScalar(t, <-items, itemColon, ":", 3)
+	assertScalar(t, <-items, itemSymbol, "app", 4)
+	assertScalar(t, <-items, itemColon, ":", 4)
+	assertScalar(t, <-items, itemString, "example", 4)
 }
 
-func TestPosition(t *testing.T) {
+func TestLexPosition(t *testing.T) {
 	manifest := `
 apiVersion: "apps/v1"
 kind: "Deplöyment"
@@ -235,7 +218,6 @@ metadata:
 	assertPosition(t, <-items, "Deplöyment", 30, 11, 2, 6)
 	assertPosition(t, <-items, "metadata", 43, 8, 3, 0)
 	assertPosition(t, <-items, ":", 51, 1, 3, 8)
-	assertPosition(t, <-items, "  ", 53, 2, 4, 0)
 	assertPosition(t, <-items, "name", 55, 4, 4, 2)
 	assertPosition(t, <-items, ":", 59, 1, 4, 6)
 	assertPosition(t, <-items, "schön", 62, 6, 4, 8)

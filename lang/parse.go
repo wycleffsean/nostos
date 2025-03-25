@@ -316,6 +316,7 @@ func (self *parser) accept() *item {
 	peeked := self.peek()
 	self.peeked = nil
 	self.current = peeked
+	self.currentIndent = peeked.indent
 	return peeked
 }
 
@@ -328,17 +329,7 @@ func (self *parser) peekPrecedence() Precedence {
 	return mapping.Precedence
 }
 
-func (self *parser) slurpIndents() {
-	for self.peek().typ == itemIndent {
-		self.accept()
-		self.currentIndent += 1
-	}
-}
-
 func (self *parser) parseExpression(precedence Precedence) node {
-	priorIndent := self.currentIndent
-	self.slurpIndents()
-
 	token := self.accept()
 	if token == nil {
 		return self._error("TODO: Unexpected end of stream")
@@ -371,7 +362,6 @@ func (self *parser) parseExpression(precedence Precedence) node {
 	// indentation form map literals
 	self.priorIndent = self.currentIndent
 	self.priorNode = lhs
-	self.currentIndent = priorIndent
 	return lhs
 }
 

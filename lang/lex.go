@@ -16,7 +16,6 @@ const (
 	itemDocStart
 	itemDocEnd
 	itemEOF
-	itemIndent
 	itemList
 	itemColon
 	// itemElse
@@ -39,6 +38,7 @@ type item struct {
 	typ      itemType // Type, such as itemNumber
 	val      string   // Value, such as "23.2"
 	position Position
+	indent   uint
 }
 
 type Position struct {
@@ -78,12 +78,13 @@ func (i item) String() string {
 // holds the state of the scanner
 type lexer struct {
 	// TODO: input should be a (buffered) reader
-	input         string    // the string being scanned
-	start         uint      // start position of this item
-	pos           uint      // current position in the input
-	currentLine   uint      // 0 indexed count of newline characters seen
-	offset        uint      // 0 indexed count of character offset - corresponds to LSP spec PositionEncodingKind
-	currentOffset uint      // counter for offset
+	input         string // the string being scanned
+	start         uint   // start position of this item
+	pos           uint   // current position in the input
+	currentLine   uint   // 0 indexed count of newline characters seen
+	offset        uint   // 0 indexed count of character offset - corresponds to LSP spec PositionEncodingKind
+	currentOffset uint   // counter for offset
+	currentIndent uint
 	width         uint      // width of last rune read
 	items         chan item // channel of scanned items
 }
@@ -116,7 +117,7 @@ func (l *lexer) markOffset() {
 
 func (l *lexer) emit(t itemType) {
 	position := Position{l.start, l.pos - l.start, l.currentLine, l.offset}
-	l.items <- item{t, l.input[l.start:l.pos], position}
+	l.items <- item{t, l.input[l.start:l.pos], position, l.currentIndent}
 	l.markOffset()
 	l.start = l.pos
 }
@@ -175,7 +176,7 @@ func (l *lexer) acceptRun(valid string) {
 
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	position := Position{l.start, l.pos - l.start, l.currentLine, l.currentOffset}
-	l.items <- item{itemError, fmt.Sprintf(format, args...), position}
+	l.items <- item{itemError, fmt.Sprintf(format, args...), position, l.currentIndent}
 	return nil
 }
 
@@ -234,6 +235,7 @@ func lexIndent(l *lexer) stateFn {
 		l.ignore()
 		l.currentLine += 1
 		l.currentOffset = 0
+		l.currentIndent = 0
 		l.markOffset()
 	}
 	if l.peek() == ' ' {
@@ -241,7 +243,8 @@ func lexIndent(l *lexer) stateFn {
 		if l.next() != ' ' {
 			return l.errorf("indents must contain two spaces")
 		}
-		l.emit(itemIndent)
+		l.markOffset()
+		l.currentIndent += 1
 		if l.peek() == ' ' {
 			return lexIndent
 		}
