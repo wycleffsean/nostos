@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 )
 
 type parser struct {
@@ -41,14 +42,12 @@ type parser struct {
 	currentIndent uint
 	priorIndent   uint
 	priorNode     node
-	tokens        chan item
-	nodes         chan node
+	tokens        <-chan item
 }
 
-func NewParser(tokens chan item) *parser {
+func NewParser(tokens <-chan item) *parser {
 	return &parser{
 		tokens: tokens,
-		nodes:  make(chan node),
 	}
 }
 
@@ -78,6 +77,11 @@ type binaryOpNode interface {
 	node
 	leftExpr() node
 	rightExpr() node
+}
+
+type collectionNode interface {
+	node
+	Symbols() []node
 }
 
 type errorNode interface {
@@ -238,6 +242,18 @@ func (m *Map) Pos() Position {
 
 }
 
+// TODO: we're cheating here, this is
+// a poorly defined interface because collections
+// might be key/value or just value.  We're looking
+// for the symbols not the value nodes
+func (m *Map) Symbols() []node {
+	symbols := make([]node, 0)
+	for key, _ := range *m {
+		symbols = append(symbols, &key)
+	}
+	return symbols
+}
+
 // func (m *Map) End() pos {
 // 	var pos pos = math.MaxInt32
 // 	for _, value := range *m {
@@ -282,20 +298,28 @@ func leftDenotationUnhandled(self *parser, _ node) node {
 }
 
 func (self *parser) Parse() node {
-	go self.parseRun()
-	return <-self.nodes
-}
-
-func (self *parser) parseRun() {
+	var root node
 	for !self.isEOF() {
 		res := self.parseExpression(precedenceLowest)
-		if err, ok := res.(errorNode); ok {
+		// we only loop to manage sibling leafs
+		// e.g.
+		//   foo: "first loop"
+		//   bar: "second loop"
+		// this is true for maps and arrays
+		// both iterations should yield the same node, if they
+		// aren't then this would be a statement which is always
+		// an error
+		// TODO: this check doesn't actually work
+		// if root != nil && res != root {
+		// 	log.Fatalf("Parse error: document must be a single expression\n\tcurrent token: %v\n\tnext token: %v\n\troot: %v\n\tres:  %v\n", self.current, self.peek(), root, res)
+		// }
+		root = res
+		if err, ok := root.(errorNode); ok {
 			log.Fatalf("Parse error: %v\n current token: %v\n next token: %v", err, self.current, self.peek())
 		}
-		self.nodes <- res
 
 	}
-	// close(self.tokens) // No more tokens will be delivered
+	return root
 }
 
 func (self *parser) isEOF() bool {
@@ -306,9 +330,18 @@ func (self *parser) peek() *item {
 	if self.peeked != nil {
 		return self.peeked
 	} else {
-		peeked := <-self.tokens
-		self.peeked = &peeked
-		return &peeked
+		select {
+		case tok, ok := <-self.tokens:
+			if !ok {
+				panic("lexer channel closed unexpectedly")
+
+			}
+			// fmt.Printf("-> %v\n", tok)
+			self.peeked = &tok
+			return &tok
+		case <-time.After(2 * time.Second):
+			panic("parser peek timed out waiting for token")
+		}
 	}
 }
 
@@ -317,6 +350,7 @@ func (self *parser) accept() *item {
 	self.peeked = nil
 	self.current = peeked
 	self.currentIndent = peeked.indent
+	// fmt.Printf("accept: parse.current: %v\n", peeked)
 	return peeked
 }
 
@@ -378,6 +412,7 @@ func _map(self *parser, key node) node {
 
 	priorMap, last_node_was_map := self.priorNode.(*Map)
 
+	// fmt.Printf("current_indent: %d, priorIndent: %d, last_node_was_map: %t\n", self.currentIndent, self.priorIndent, last_node_was_map)
 	if self.currentIndent == self.priorIndent && last_node_was_map {
 		// continue building existing map
 		m = *priorMap
@@ -390,5 +425,6 @@ func _map(self *parser, key node) node {
 		return err
 	}
 	m[*key.(*Symbol)] = value
+
 	return &m
 }

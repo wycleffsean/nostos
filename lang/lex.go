@@ -2,6 +2,8 @@ package lang
 
 import (
 	"fmt"
+	"reflect"
+	"runtime"
 	"strings"
 	"unicode/utf8"
 )
@@ -10,7 +12,8 @@ type itemType int
 
 //go:generate stringer -type=itemType
 const (
-	itemError itemType = iota // error occurred;
+	itemUndefined itemType = iota // undefined should never occur, we have a lexing error;
+	itemError                     // error occurred;
 	// value is text of error
 	itemDot // the cursor, spelled '.'
 	itemDocStart
@@ -91,13 +94,17 @@ type lexer struct {
 
 type stateFn func(*lexer) stateFn
 
-func NewStringLexer(input string) (*lexer, chan item) {
+func NewStringLexer(input string) (*lexer, <-chan item) {
 	l := &lexer{
 		input: input,
 		items: make(chan item),
 	}
 	go l.run() // Concurrent run state machine
 	return l, l.items
+}
+
+func GetFunctionName(i interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
 func (l *lexer) run() {
@@ -117,7 +124,7 @@ func (l *lexer) markOffset() {
 
 func (l *lexer) emit(t itemType) {
 	position := Position{l.start, l.pos - l.start, l.currentLine, l.offset}
-	l.items <- item{t, l.input[l.start:l.pos], position, l.currentIndent}
+	l.publish(item{t, l.input[l.start:l.pos], position, l.currentIndent})
 	l.markOffset()
 	l.start = l.pos
 }
@@ -176,8 +183,14 @@ func (l *lexer) acceptRun(valid string) {
 
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	position := Position{l.start, l.pos - l.start, l.currentLine, l.currentOffset}
-	l.items <- item{itemError, fmt.Sprintf(format, args...), position, l.currentIndent}
+	message := fmt.Sprintf(format, args...)
+	l.publish(item{itemError, message, position, l.currentIndent})
 	return nil
+}
+
+func (l *lexer) publish(item item) {
+	// fmt.Printf("<- %v\n", item)
+	l.items <- item
 }
 
 func isAlpha(r rune) bool {
@@ -209,6 +222,8 @@ func lexInDocument(l *lexer) stateFn {
 		return nil
 	case r == '\n':
 		return lexIndent
+	case r == '\t':
+		panic("Lex error: document has a horizontal tab which is currently not supported\n")
 	case r == '-':
 		return lexList
 	case r == ':':
@@ -224,7 +239,15 @@ func lexInDocument(l *lexer) stateFn {
 		if l.peek() == '"' {
 			return lexString
 		}
-		return lexSymbol
+		if isAlpha(l.peek()) {
+			return lexSymbol
+		}
+		// TODO: there's a potential for infinite loops here, we need
+		//   to redesign the lexer in a way that forces the cursor to make
+		//   progress at all times
+		// if there's a bug in the lexer we've likely hit this branch
+		// fmt.Printf("===lexInDocument - hit default case with r='%c'\n", r)
+		return lexInDocument
 	}
 }
 

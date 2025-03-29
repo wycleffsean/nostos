@@ -42,7 +42,7 @@ func parseString(input string) node {
 
 // // Scalars
 func TestParseString(t *testing.T) {
-	got:= parseString("\"yo\"")
+	got := parseString("\"yo\"")
 	// assertScalar(t, got, node{})
 	wanted := String{Position{}, "yo"}
 	if str, ok := got.(*String); ok {
@@ -73,34 +73,37 @@ func TestParseYamlSimpleMap(t *testing.T) {
 	}
 }
 
-func TestParseYamlMap(t *testing.T) {
-	got:= parseString(`
-  foo: "bar"
-  baz: "bar"
-    	`)
+func TestParseMultiYamlMap(t *testing.T) {
+	assert := func(version, code string) {
+		got := parseString(code)
+		foo := Symbol{Position{}, "foo"}
+		bar := Symbol{Position{}, "baz"}
+		var wanted Map = make(map[Symbol]node)
+		value := &String{Position{}, "bar"}
+		wanted[foo] = value
+		wanted[bar] = value
 
-	foo := Symbol{Position{}, "foo"}
-	bar := Symbol{Position{}, "baz"}
-	var wanted Map = make(map[Symbol]node)
-	value := &String{Position{}, "bar"}
-	wanted[foo] = value
-	wanted[bar] = value
-
-	if m, ok := got.(*Map); ok {
-		if !reflect.DeepEqual(*m, wanted) {
-			t.Errorf("maps aren't equal - expected: %v got: %v", wanted, *m)
+		if m, ok := got.(*Map); ok {
+			if !reflect.DeepEqual(*m, wanted) {
+				t.Errorf("%s: maps aren't equal - expected: %v got: %v", version, wanted, *m)
+			}
+		} else {
+			t.Errorf("can't cast to Map: %v", got)
 		}
-	} else {
-		t.Errorf("can't cast to Map: %v", got)
 	}
+	assert("unindented", `
+foo: "bar"
+baz: "bar"`)
+	assert("leading indent", `
+  foo: "bar"
+  baz: "bar"`)
 }
 
 func TestParseYamlNestedMaps(t *testing.T) {
 	got := parseString(`
   foo: "bar"
   baz:
-    foo: "bar"
-    	`)
+    foo: "bar"`)
 
 	foo := Symbol{Position{}, "foo"}
 	baz := Symbol{Position{}, "baz"}

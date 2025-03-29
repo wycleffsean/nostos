@@ -8,21 +8,22 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[itemError-0]
-	_ = x[itemDot-1]
-	_ = x[itemDocStart-2]
-	_ = x[itemDocEnd-3]
-	_ = x[itemEOF-4]
-	_ = x[itemList-5]
-	_ = x[itemColon-6]
-	_ = x[itemNumber-7]
-	_ = x[itemString-8]
-	_ = x[itemSymbol-9]
+	_ = x[itemUndefined-0]
+	_ = x[itemError-1]
+	_ = x[itemDot-2]
+	_ = x[itemDocStart-3]
+	_ = x[itemDocEnd-4]
+	_ = x[itemEOF-5]
+	_ = x[itemList-6]
+	_ = x[itemColon-7]
+	_ = x[itemNumber-8]
+	_ = x[itemString-9]
+	_ = x[itemSymbol-10]
 }
 
-const _itemType_name = "itemErroritemDotitemDocStartitemDocEnditemEOFitemListitemColonitemNumberitemStringitemSymbol"
+const _itemType_name = "itemUndefineditemErroritemDotitemDocStartitemDocEnditemEOFitemListitemColonitemNumberitemStringitemSymbol"
 
-var _itemType_index = [...]uint8{0, 9, 16, 28, 38, 45, 53, 62, 72, 82, 92}
+var _itemType_index = [...]uint8{0, 13, 22, 29, 41, 51, 58, 66, 75, 85, 95, 105}
 
 func (i itemType) String() string {
 	if i < 0 || i >= itemType(len(_itemType_index)-1) {

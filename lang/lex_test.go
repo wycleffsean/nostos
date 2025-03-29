@@ -6,36 +6,35 @@ import (
 
 // Test Helpers
 
-func assertChannelClosed(t *testing.T, items chan item) {
-	i := <-items
-	if i.typ != itemEOF {
-		t.Errorf("expected EOF")
+func assertEOF(t *testing.T, items <-chan item) {
+	eof := <-items
+	if eof.typ != itemEOF {
+		t.Errorf("Expecting EOF but got %s", eof.typ)
 	}
-	_, ok := <-items
-	if ok {
-		t.Errorf("got item after EOF: %q", i)
+	if item, ok := <-items; ok {
+		t.Errorf("got item after EOF  %q", item)
 	}
 }
 
-func single(t *testing.T, items chan item) item {
+func single(t *testing.T, items <-chan item) item {
 	res := <-items
-	assertChannelClosed(t, items)
+	assertEOF(t, items)
 	return res
 }
 
-func pair(t *testing.T, items chan item) (item, item) {
+func pair(t *testing.T, items <-chan item) (item, item) {
 	itema := <-items
 	itemb := <-items
-	assertChannelClosed(t, items)
+	assertEOF(t, items)
 	return itema, itemb
 }
 
-func keyValue(t *testing.T, items chan item) (item, item) {
+func keyValue(t *testing.T, items <-chan item) (item, item) {
 	itema := <-items
 	colon := <-items
 	itemb := <-items
 	assertScalar(t, colon, itemColon, ":", 0)
-	assertChannelClosed(t, items)
+	assertEOF(t, items)
 	return itema, itemb
 }
 
@@ -141,6 +140,7 @@ func TestLexIndent(t *testing.T) {
 	assertScalar(t, key, itemSymbol, "foo", 1)
 	assertScalar(t, colon, itemColon, ":", 1)
 	assertScalar(t, value, itemSymbol, "bar", 1)
+	assertEOF(t, items)
 }
 
 func TestLexManifest(t *testing.T) {
@@ -198,6 +198,26 @@ spec:
 	assertScalar(t, <-items, itemSymbol, "app", 4)
 	assertScalar(t, <-items, itemColon, ":", 4)
 	assertScalar(t, <-items, itemString, "example", 4)
+	assertScalar(t, <-items, itemSymbol, "spec", 2)
+	assertScalar(t, <-items, itemColon, ":", 2)
+	assertScalar(t, <-items, itemSymbol, "containers", 3)
+	assertScalar(t, <-items, itemColon, ":", 3)
+	assertScalar(t, <-items, itemList, "      ", 3) // TODO: this should be "-" or nil
+	// TODO: the indentations after the list are wrong
+	//   we'll need to add 1 to these values, or ignore the list symbol
+	assertScalar(t, <-items, itemSymbol, "name", 3)
+	assertScalar(t, <-items, itemColon, ":", 3)
+	assertScalar(t, <-items, itemString, "example-container", 3)
+	assertScalar(t, <-items, itemSymbol, "image", 4)
+	assertScalar(t, <-items, itemColon, ":", 4)
+	assertScalar(t, <-items, itemString, "example-image", 4)
+	assertScalar(t, <-items, itemSymbol, "ports", 4)
+	assertScalar(t, <-items, itemColon, ":", 4)
+	assertScalar(t, <-items, itemList, "        ", 4) // TODO: this should be "-" or nil
+	assertScalar(t, <-items, itemSymbol, "containerPort", 4)
+	assertScalar(t, <-items, itemColon, ":", 4)
+	assertScalar(t, <-items, itemNumber, "8080", 4)
+	assertEOF(t, items)
 }
 
 func TestLexPosition(t *testing.T) {
@@ -221,4 +241,5 @@ metadata:
 	assertPosition(t, <-items, "name", 55, 4, 4, 2)
 	assertPosition(t, <-items, ":", 59, 1, 4, 6)
 	assertPosition(t, <-items, "schön", 62, 6, 4, 8)
+	assertEOF(t, items)
 }

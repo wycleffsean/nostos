@@ -1,8 +1,9 @@
 package lang
 
 import (
-	"go.lsp.dev/uri"
 	"sync"
+
+	"go.lsp.dev/uri"
 )
 
 type Ast struct {
@@ -27,6 +28,34 @@ func NewAst(input string, uri uri.URI) Ast {
 }
 
 func (self *Ast) ExtractSymbols() []*Symbol {
-    symbols := make([]*Symbol, 50)
+    return extractSymbols(self.RootNode)
+}
+
+func extractSymbols(ast_node node) []*Symbol {
+    symbols := make([]*Symbol, 0)
+    switch node := ast_node.(type) {
+        case *Symbol:
+            symbols = append(symbols, node)
+        case binaryOpNode:
+            symbols = append(symbols, extractSymbolsBinary(node)...)
+        case collectionNode:
+            symbols = append(symbols, extractSymbolsCollection(node)...)
+        default:
+    }
+    return symbols
+}
+
+func extractSymbolsBinary(binary binaryOpNode) []*Symbol {
+    symbols := make([]*Symbol, 0)
+    // symbols = append(symbols, extractSymbols(node.leftExpr())...)
+    // symbols = append(symbols, extractSymbols(node.rightExpr())...)
+    return symbols
+}
+
+func extractSymbolsCollection(collection collectionNode) []*Symbol {
+    symbols := make([]*Symbol, 0)
+    for _, child := range collection.Symbols() {
+        symbols = append(symbols, extractSymbols(child)...)
+    }
     return symbols
 }
