@@ -25,7 +25,7 @@
         # export GOROOT=${pkgs.go}
         export PATH=$PATH:$GOPATH/bin:$GOROOT/bin
         echo "Development shell"
-        exec $SHELL # use user shell
+        exec zsh # use user shell
       '';
     };
   });

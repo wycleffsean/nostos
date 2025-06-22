@@ -36,6 +36,15 @@ func FetchSpecifications(registry *types.Registry) error {
 	return cachedFetchErr
 }
 
+func FetchAndFillRegistry() (*types.Registry, error) {
+		// Create type registry
+		registry := types.NewRegistry()
+
+		// Fetch Kubernetes specifications and populate the registry
+		err := FetchSpecifications(registry)
+		return registry, err
+}
+
 // fetchAndStoreSpecifications performs the actual retrieval of schemas and populates the registry.
 // This function is intended to be called only once (via FetchSpecifications).
 func fetchAndStoreSpecifications(registry *types.Registry) error {
@@ -218,7 +227,7 @@ func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[st
 		Version:     version,
 		Kind:        kind,
 		Scope:       scope,
-		Description: schemaObj["description"].(string),
+		Description: getStringField(schemaObj, "description"),
 		Fields:      []types.FieldDefinition{},
 	}
 	// Only proceed if the schema has defined properties (i.e., it's an object schema)
