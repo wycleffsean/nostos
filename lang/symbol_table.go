@@ -34,6 +34,26 @@ type SymbolTable struct {
 	docIndex map[uri.URI][]*SymbolEntry // Tracks symbols by document for easy removal
 }
 
+// LookupByName retrieves a symbol entry by its name.
+func (s *SymbolTable) LookupByName(name string) (*SymbolEntry, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	entry, ok := s.byName[name]
+	return entry, ok
+}
+
+// LookupByPosition retrieves a symbol entry by its starting position.
+func (s *SymbolTable) LookupByPosition(pos Position) (*SymbolEntry, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	item := &SymbolEntry{Begin: pos}
+	found := s.byPos.Get(item)
+	if found == nil {
+		return nil, false
+	}
+	return found.(*SymbolEntry), true
+}
+
 // NewSymbolTable initializes a new symbol table.
 func NewSymbolTable(registry *types.Registry) *SymbolTable {
 	return &SymbolTable{
@@ -66,17 +86,21 @@ func (s *SymbolTable) RemoveSymbolsForDocument(uri uri.URI) {
 }
 
 // AddSymbol inserts a symbol into the table and tracks it by document.
-func (s *SymbolTable) AddSymbol(symbol *Symbol) {
+func (s *SymbolTable) AddSymbol(symbol *Symbol, doc uri.URI) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	symbolEntry := SymbolEntry{Symbol: symbol}
+	symbolEntry := SymbolEntry{
+		Symbol:    symbol,
+		Begin:     symbol.Position,
+		DefinedIn: doc,
+	}
 
 	s.byName[symbol.Text] = &symbolEntry
 	s.byPos.ReplaceOrInsert(&symbolEntry)
 
 	// Track in docIndex for easy removal later
-	s.docIndex[symbolEntry.DefinedIn] = append(s.docIndex[symbolEntry.DefinedIn], &symbolEntry)
+	s.docIndex[doc] = append(s.docIndex[doc], &symbolEntry)
 }
 
 func (s *SymbolTable) ProcessAst(ast *Ast) {
@@ -85,6 +109,6 @@ func (s *SymbolTable) ProcessAst(ast *Ast) {
 
 	// Traverse AST and add new symbols
 	for _, symbol := range ast.ExtractSymbols() {
-		s.AddSymbol(symbol)
+		s.AddSymbol(symbol, ast.Document)
 	}
 }
