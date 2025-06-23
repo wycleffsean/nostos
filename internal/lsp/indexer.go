@@ -78,7 +78,7 @@ func (a *indexer) ensureRegistry() *types.Registry {
 		return reg
 	}
 	select {
-	case reg, _ = <-a.state.registryReady:
+	case reg = <-a.state.registryReady:
 		a.state.mu.Lock()
 		a.state.registry = reg
 		a.state.mu.Unlock()
@@ -107,12 +107,4 @@ func (a *indexer) reindex() {
 		st.ProcessAst(&ast)
 	}
 	a.state.symbolTable.Store(st)
-}
-
-func (a *indexer) currentSymbolTable() *lang.SymbolTable {
-	st := a.state.symbolTable.Load()
-	if st != nil {
-		return st
-	}
-	return nil
 }

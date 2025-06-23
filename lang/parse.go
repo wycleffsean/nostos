@@ -68,11 +68,6 @@ type node interface {
 	// End() Position // position of first character immediately after the node
 }
 
-type unaryOpNode interface {
-	node
-	expr() node
-}
-
 type binaryOpNode interface {
 	node
 	leftExpr() node
@@ -232,8 +227,8 @@ type Map map[Symbol]node
 
 // These functions have really terrible O(...) performance
 func (m *Map) Pos() Position {
-	var pos Position = Position{}
-	for symbol, _ := range *m {
+	var pos Position
+	for symbol := range *m {
 		if pos.Less(symbol.Pos()) {
 			pos = symbol.Pos()
 		}
@@ -248,7 +243,7 @@ func (m *Map) Pos() Position {
 // for the symbols not the value nodes
 func (m *Map) Symbols() []node {
 	symbols := make([]node, 0)
-	for key, _ := range *m {
+	for key := range *m {
 		symbols = append(symbols, &key)
 	}
 	return symbols
@@ -285,22 +280,22 @@ func init() {
 	tokenMap[itemSymbol] = tokenMapping{precedenceLowest, symbol, leftDenotationUnhandled}
 }
 
-func (self *parser) _error(message string) node {
-	return &ParseError{message, self.current}
+func (p *parser) _error(message string) node {
+	return &ParseError{message, p.current}
 }
 
-func nullDenotationUnhandled(self *parser) node {
-	return self._error(fmt.Sprintf("unhandled null denotation reached for '%v'", self.current.typ))
+func nullDenotationUnhandled(p *parser) node {
+	return p._error(fmt.Sprintf("unhandled null denotation reached for '%v'", p.current.typ))
 }
 
-func leftDenotationUnhandled(self *parser, _ node) node {
-	return self._error(fmt.Sprintf("unhandled left denotation reached for '%v'", self.current.typ))
+func leftDenotationUnhandled(p *parser, _ node) node {
+	return p._error(fmt.Sprintf("unhandled left denotation reached for '%v'", p.current.typ))
 }
 
-func (self *parser) Parse() node {
+func (p *parser) Parse() node {
 	var root node
-	for !self.isEOF() {
-		res := self.parseExpression(precedenceLowest)
+	for !p.isEOF() {
+		res := p.parseExpression(precedenceLowest)
 		// we only loop to manage sibling leafs
 		// e.g.
 		//   foo: "first loop"
@@ -315,29 +310,29 @@ func (self *parser) Parse() node {
 		// }
 		root = res
 		if err, ok := root.(errorNode); ok {
-			log.Fatalf("Parse error: %v\n current token: %v\n next token: %v", err, self.current, self.peek())
+			log.Fatalf("Parse error: %v\n current token: %v\n next token: %v", err, p.current, p.peek())
 		}
 
 	}
 	return root
 }
 
-func (self *parser) isEOF() bool {
-	return self.peek().typ == itemEOF
+func (p *parser) isEOF() bool {
+	return p.peek().typ == itemEOF
 }
 
-func (self *parser) peek() *item {
-	if self.peeked != nil {
-		return self.peeked
+func (p *parser) peek() *item {
+	if p.peeked != nil {
+		return p.peeked
 	} else {
 		select {
-		case tok, ok := <-self.tokens:
+		case tok, ok := <-p.tokens:
 			if !ok {
 				panic("lexer channel closed unexpectedly")
 
 			}
 			// fmt.Printf("-> %v\n", tok)
-			self.peeked = &tok
+			p.peeked = &tok
 			return &tok
 		case <-time.After(2 * time.Second):
 			panic("parser peek timed out waiting for token")
@@ -345,17 +340,17 @@ func (self *parser) peek() *item {
 	}
 }
 
-func (self *parser) accept() *item {
-	peeked := self.peek()
-	self.peeked = nil
-	self.current = peeked
-	self.currentIndent = peeked.indent
+func (p *parser) accept() *item {
+	peeked := p.peek()
+	p.peeked = nil
+	p.current = peeked
+	p.currentIndent = peeked.indent
 	// fmt.Printf("accept: parse.current: %v\n", peeked)
 	return peeked
 }
 
-func (self *parser) peekPrecedence() Precedence {
-	token := self.peek()
+func (p *parser) peekPrecedence() Precedence {
+	token := p.peek()
 	mapping, ok := tokenMap[token.typ]
 	if !ok {
 		return -1 // we've probably hit EOF
@@ -363,26 +358,26 @@ func (self *parser) peekPrecedence() Precedence {
 	return mapping.Precedence
 }
 
-func (self *parser) parseExpression(precedence Precedence) node {
-	token := self.accept()
+func (p *parser) parseExpression(precedence Precedence) node {
+	token := p.accept()
 	if token == nil {
-		return self._error("TODO: Unexpected end of stream")
+		return p._error("TODO: Unexpected end of stream")
 	}
 	mapping, ok := tokenMap[token.typ]
 	if !ok {
-		return self._error(fmt.Sprintf("missing parser production for '%v'", token.typ))
+		return p._error(fmt.Sprintf("missing parser production for '%v'", token.typ))
 	}
-	lhs := mapping.parseFn(self)
+	lhs := mapping.parseFn(p)
 	if err, ok := lhs.(errorNode); ok {
 		return err
 	}
-	for precedence < self.peekPrecedence() {
-		token = self.accept()
+	for precedence < p.peekPrecedence() {
+		token = p.accept()
 		if token == nil {
-			return self._error("TODO: Unexpected end of stream")
+			return p._error("TODO: Unexpected end of stream")
 		}
 		mapping := tokenMap[token.typ]
-		lhs = mapping.infixFn(self, lhs)
+		lhs = mapping.infixFn(p, lhs)
 		if err, ok := lhs.(errorNode); ok {
 			return err
 		}
@@ -394,33 +389,33 @@ func (self *parser) parseExpression(precedence Precedence) node {
 	// one another
 	// e.g. successive key value pairs with like
 	// indentation form map literals
-	self.priorIndent = self.currentIndent
-	self.priorNode = lhs
+	p.priorIndent = p.currentIndent
+	p.priorNode = lhs
 	return lhs
 }
 
-func _string(self *parser) node {
-	return &String{Position{}, self.current.val}
+func _string(p *parser) node {
+	return &String{Position{}, p.current.val}
 }
 
-func symbol(self *parser) node {
-	return &Symbol{Position{}, self.current.val}
+func symbol(p *parser) node {
+	return &Symbol{Position{}, p.current.val}
 }
 
-func _map(self *parser, key node) node {
+func _map(p *parser, key node) node {
 	var m Map
 
-	priorMap, last_node_was_map := self.priorNode.(*Map)
+	priorMap, last_node_was_map := p.priorNode.(*Map)
 
-	// fmt.Printf("current_indent: %d, priorIndent: %d, last_node_was_map: %t\n", self.currentIndent, self.priorIndent, last_node_was_map)
-	if self.currentIndent == self.priorIndent && last_node_was_map {
+	// fmt.Printf("current_indent: %d, priorIndent: %d, last_node_was_map: %t\n", p.currentIndent, p.priorIndent, last_node_was_map)
+	if p.currentIndent == p.priorIndent && last_node_was_map {
 		// continue building existing map
 		m = *priorMap
 	} else {
 		m = make(map[Symbol]node)
 	}
 
-	value := self.parseExpression(precedenceEquality)
+	value := p.parseExpression(precedenceEquality)
 	if err, ok := value.(errorNode); ok {
 		return err
 	}

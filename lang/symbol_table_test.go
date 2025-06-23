@@ -9,22 +9,6 @@ import (
 	"github.com/wycleffsean/nostos/pkg/types"
 )
 
-func setup(asts ...*Ast) *SymbolTable {
-	registry := types.NewRegistry()
-	st := NewSymbolTable(registry)
-
-	for _, ast := range asts {
-		st.ProcessAst(ast)
-	}
-	return st
-}
-
-const simpleCode string = `
-  cab: "taxi"
-  cat:
-    bat: "baseball"
-`
-
 func TestSymbolTableLookupByName(t *testing.T) {
 	registry := types.NewRegistry()
 	st := NewSymbolTable(registry)
