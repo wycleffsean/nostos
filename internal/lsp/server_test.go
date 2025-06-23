@@ -9,20 +9,25 @@ import (
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/jsonrpc2/fake"
 	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 // testStreamServer adapts the lsp.StartServer logic for in-memory streams.
-type testStreamServer struct{ logger *zap.Logger }
+type testStreamServer struct {
+	logger  *zap.Logger
+	handler *Handler
+}
 
 // lspTestEnv holds resources for an LSP test instance.
 type lspTestEnv struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-       server *fake.PipeServer
-       conn   jsonrpc2.Conn
-       client protocol.Server
+	ctx     context.Context
+	cancel  context.CancelFunc
+	server  *fake.PipeServer
+	conn    jsonrpc2.Conn
+	client  protocol.Server
+	handler *Handler
 }
 
 // setup spins up a new in-memory LSP server and returns a test environment.
@@ -34,18 +39,20 @@ func setup(t *testing.T) *lspTestEnv {
 	encCfg := zap.NewDevelopmentEncoderConfig()
 	logger := zap.New(zapcore.NewCore(zapcore.NewJSONEncoder(encCfg), zapcore.AddSync(&buf), zap.DebugLevel))
 
-	server := fake.NewPipeServer(ctx, testStreamServer{logger: logger}, nil)
+	var handler Handler
+	server := fake.NewPipeServer(ctx, testStreamServer{logger: logger, handler: &handler}, nil)
 	conn := server.Connect(ctx)
 	conn.Go(ctx, jsonrpc2.MethodNotFoundHandler)
 
 	client := protocol.ServerDispatcher(conn, logger)
 
 	return &lspTestEnv{
-		ctx:    ctx,
-		cancel: cancel,
-		server: server,
-		conn:   conn,
-		client: client,
+		ctx:     ctx,
+		cancel:  cancel,
+		server:  server,
+		conn:    conn,
+		client:  client,
+		handler: &handler,
 	}
 }
 
@@ -64,9 +71,30 @@ func (t testStreamServer) ServeStream(ctx context.Context, conn jsonrpc2.Conn) e
 		return err
 	}
 	handler.state.client = protocol.ClientDispatcher(conn, logger)
+	handler.state.indexer.start(ctx)
+	if t.handler != nil {
+		*t.handler = handler
+	}
 	conn.Go(ctx, protocol.ServerHandler(handler, jsonrpc2.MethodNotFoundHandler))
 	<-conn.Done()
 	return conn.Err()
+}
+
+// waitForDocument polls the handler's document store until the text for uri
+// matches expect or the timeout expires.
+func waitForDocument(t *testing.T, h *Handler, uri protocol.DocumentURI, expect string) {
+	t.Helper()
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		h.state.mu.RLock()
+		got, ok := h.state.documents[uri]
+		h.state.mu.RUnlock()
+		if ok && got == expect {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("document %s did not reach expected text", uri)
 }
 
 func TestInitializeAndInitialized(t *testing.T) {
@@ -93,4 +121,77 @@ func TestInitializeAndInitialized(t *testing.T) {
 		t.Fatalf("Initialized failed: %v", err)
 	}
 
+}
+
+func TestDidChange(t *testing.T) {
+	env := setup(t)
+	defer env.teardown()
+
+	client := env.client
+	ctx := env.ctx
+
+	_, err := client.Initialize(ctx, &protocol.InitializeParams{RootURI: "file:///tmp"})
+	if err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+	if err := client.Initialized(ctx, &protocol.InitializedParams{}); err != nil {
+		t.Fatalf("Initialized failed: %v", err)
+	}
+
+	docURI := protocol.DocumentURI("file:///foo.no")
+	openParams := &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        docURI,
+			LanguageID: "nostos",
+			Version:    1,
+			Text:       "a: 1\n",
+		},
+	}
+	if err := client.DidOpen(ctx, openParams); err != nil {
+		t.Fatalf("DidOpen failed: %v", err)
+	}
+	waitForDocument(t, env.handler, docURI, "a: 1\n")
+
+	changeParams := &protocol.DidChangeTextDocumentParams{
+		TextDocument: protocol.VersionedTextDocumentIdentifier{
+			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: docURI},
+			Version:                2,
+		},
+		ContentChanges: []protocol.TextDocumentContentChangeEvent{{Text: "a: 2\n"}},
+	}
+	if err := client.DidChange(ctx, changeParams); err != nil {
+		t.Fatalf("DidChange failed: %v", err)
+	}
+
+	waitForDocument(t, env.handler, docURI, "a: 2\n")
+}
+
+func TestDefinition(t *testing.T) {
+	env := setup(t)
+	defer env.teardown()
+
+	client := env.client
+	ctx := env.ctx
+
+	_, err := client.Initialize(ctx, &protocol.InitializeParams{RootURI: "file:///tmp"})
+	if err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	locs, err := client.Definition(ctx, &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentURI("file:///foo.no")},
+			Position:     protocol.Position{Line: 0, Character: 0},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Definition failed: %v", err)
+	}
+	want := []protocol.Location{{
+		URI:   uri.File("foo.no"),
+		Range: protocol.Range{Start: protocol.Position{Line: 0, Character: 0}, End: protocol.Position{Line: 0, Character: 0}},
+	}}
+	if len(locs) != 1 || locs[0] != want[0] {
+		t.Fatalf("unexpected definition result: %#v", locs)
+	}
 }
