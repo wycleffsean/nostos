@@ -2,8 +2,8 @@ package lsp
 
 import (
 	"context"
-	"go.lsp.dev/protocol"
 	"github.com/wycleffsean/nostos/pkg/kube"
+	"go.lsp.dev/protocol"
 )
 
 func StartRegistryWorker(ctx context.Context, state *ServerState) {
@@ -29,6 +29,9 @@ func runRegistryWorker(ctx context.Context, state *ServerState) {
 	}
 
 	log.Sugar().Infow("Registry ready")
+	state.mu.Lock()
+	state.registry = registry
+	state.mu.Unlock()
 	state.registryReady <- registry
 	close(state.registryReady) // ✅ signal completion to listeners
 
