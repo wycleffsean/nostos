@@ -11,8 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
-
 // StartServer starts the language server.
 // It reads from stdin and writes to stdout.
 func StartServer(logger *zap.Logger) {
@@ -29,6 +27,8 @@ func StartServer(logger *zap.Logger) {
 
 	client := protocol.ClientDispatcher(conn, logger)
 	handler.state.client = client
+
+	handler.state.indexer.start(ctx)
 
 	if err != nil {
 		logger.Sugar().Fatalf("while initializing handler: %w", err)

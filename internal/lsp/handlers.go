@@ -2,11 +2,14 @@ package lsp
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
+
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 	"go.uber.org/zap"
-	"sync"
 
+	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/pkg/types"
 )
 
@@ -17,7 +20,12 @@ type ServerState struct {
 	client        protocol.Client
 	projectRoot   uri.URI
 	registryReady chan *types.Registry
-	documents     map[protocol.DocumentURI]string
+
+	registry    *types.Registry
+	documents   map[protocol.DocumentURI]string
+	symbolTable atomic.Pointer[lang.SymbolTable]
+
+	indexer *indexer
 }
 
 // https://pkg.go.dev/go.lsp.dev/protocol#Server
@@ -41,6 +49,8 @@ func NewHandler(ctx context.Context, server protocol.Server, logger *zap.Logger)
 		documents:     make(map[protocol.DocumentURI]string),
 		registryReady: make(chan *types.Registry),
 	}
+	state.indexer = newIndexer(state)
+
 	return Handler{Server: server, state: state}, ctx, nil
 }
 
@@ -122,6 +132,22 @@ func (h Handler) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocume
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
+		if h.state.indexer != nil {
+			h.state.indexer.didOpen <- *params
+		}
+		return nil
+	}
+}
+
+func (h Handler) DidChange(ctx context.Context, params *protocol.DidChangeTextDocumentParams) error {
+	log.Debug("###### DidChange")
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		if h.state.indexer != nil {
+			h.state.indexer.didChange <- *params
+		}
 		return nil
 	}
 }
@@ -134,18 +160,13 @@ func (h Handler) Definition(ctx context.Context, params *protocol.DefinitionPara
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
+		_ = h.state.symbolTable.Load()
 		return []protocol.Location{
 			{
 				URI: uri.File("foo.no"),
 				Range: protocol.Range{
-					Start: protocol.Position{
-						Line:      0,
-						Character: 0,
-					},
-					End: protocol.Position{
-						Line:      0,
-						Character: 0,
-					},
+					Start: protocol.Position{Line: 0, Character: 0},
+					End:   protocol.Position{Line: 0, Character: 0},
 				},
 			},
 		}, nil
