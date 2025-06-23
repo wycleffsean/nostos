@@ -112,3 +112,22 @@ func (s *SymbolTable) ProcessAst(ast *Ast) {
 		s.AddSymbol(symbol, ast.Document)
 	}
 }
+func (s *SymbolTable) SymbolsForDocument(doc uri.URI) []*SymbolEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	entries := s.docIndex[doc]
+	out := make([]*SymbolEntry, len(entries))
+	copy(out, entries)
+	return out
+}
+
+func (s *SymbolTable) SymbolAt(doc uri.URI, pos Position) (*SymbolEntry, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, entry := range s.docIndex[doc] {
+		if entry.Begin == pos {
+			return entry, true
+		}
+	}
+	return nil, false
+}

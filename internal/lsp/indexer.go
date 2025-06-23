@@ -2,6 +2,10 @@ package lsp
 
 import (
 	"context"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
@@ -28,6 +32,42 @@ func newIndexer(state *ServerState) *indexer {
 
 func (a *indexer) start(ctx context.Context) {
 	go a.loop(ctx)
+}
+
+func (a *indexer) indexWorkspace(ctx context.Context) {
+	var roots []uri.URI
+	a.state.mu.RLock()
+	if a.state.projectRoot != "" {
+		roots = append(roots, a.state.projectRoot)
+	}
+	roots = append(roots, a.state.workspaceFolders...)
+	a.state.mu.RUnlock()
+
+	for _, r := range roots {
+		path := r.Filename()
+		filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if !strings.HasSuffix(d.Name(), ".no") {
+				return nil
+			}
+			data, err := os.ReadFile(p)
+			if err != nil {
+				return nil
+			}
+			u := uri.File(p)
+			a.state.mu.Lock()
+			a.state.documents[u] = string(data)
+			a.state.mu.Unlock()
+			return nil
+		})
+	}
+
+	a.reindex()
 }
 
 func (a *indexer) loop(ctx context.Context) {
