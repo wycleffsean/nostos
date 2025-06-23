@@ -59,8 +59,8 @@ func setup(t *testing.T) *lspTestEnv {
 func (e *lspTestEnv) teardown() {
 	_ = e.client.Shutdown(e.ctx)
 	_ = e.client.Exit(e.ctx)
-	e.conn.Close()
-	e.server.Close()
+	_ = e.conn.Close()
+	_ = e.server.Close()
 	e.cancel()
 }
 

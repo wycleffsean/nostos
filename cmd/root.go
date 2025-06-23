@@ -10,8 +10,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-var kubeconfig string
-
 // RootCmd is the base command for Nostos.
 var RootCmd = &cobra.Command{
 	Use:   "nostos",
@@ -26,7 +24,9 @@ offering a plan/apply workflow similar to Terraform, as well as an integrated la
 // Execute runs the root command.
 func Execute() {
 	// Bind the kubeconfig flag to Viper.
-	viper.BindPFlag("kubeconfig", RootCmd.PersistentFlags().Lookup("kubeconfig"))
+	if err := viper.BindPFlag("kubeconfig", RootCmd.PersistentFlags().Lookup("kubeconfig")); err != nil {
+		cobra.CheckErr(err)
+	}
 
 	if err := RootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -44,6 +44,6 @@ func init() {
 	RootCmd.PersistentFlags().String("context", "", "Kubernetes context to use")
 
 	// Bind flags to Viper for centralized config handling
-	viper.BindPFlag("kubeconfig", RootCmd.PersistentFlags().Lookup("kubeconfig"))
-	viper.BindPFlag("context", RootCmd.PersistentFlags().Lookup("context"))
+	cobra.CheckErr(viper.BindPFlag("kubeconfig", RootCmd.PersistentFlags().Lookup("kubeconfig")))
+	cobra.CheckErr(viper.BindPFlag("context", RootCmd.PersistentFlags().Lookup("context")))
 }

@@ -3,6 +3,7 @@ package kube
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -37,12 +38,12 @@ func FetchSpecifications(registry *types.Registry) error {
 }
 
 func FetchAndFillRegistry() (*types.Registry, error) {
-		// Create type registry
-		registry := types.NewRegistry()
+	// Create type registry
+	registry := types.NewRegistry()
 
-		// Fetch Kubernetes specifications and populate the registry
-		err := FetchSpecifications(registry)
-		return registry, err
+	// Fetch Kubernetes specifications and populate the registry
+	err := FetchSpecifications(registry)
+	return registry, err
 }
 
 // fetchAndStoreSpecifications performs the actual retrieval of schemas and populates the registry.
@@ -201,7 +202,7 @@ func fetchAndStoreSpecifications(registry *types.Registry) error {
 			}
 			errMsg += e.Error()
 		}
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 	return nil
 }

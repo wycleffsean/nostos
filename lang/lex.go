@@ -55,12 +55,12 @@ type Position struct {
 	CharacterOffset uint `json:"character"`
 }
 
-func (self *Position) Less(than Position) bool {
-	if self.LineNumber < than.LineNumber {
+func (p *Position) Less(than Position) bool {
+	if p.LineNumber < than.LineNumber {
 		return true
 	}
-	if self.LineNumber == than.LineNumber {
-		return self.CharacterOffset < than.CharacterOffset
+	if p.LineNumber == than.LineNumber {
+		return p.CharacterOffset < than.CharacterOffset
 	}
 	return false
 }
@@ -167,7 +167,7 @@ func (l *lexer) peek() rune {
 // accept consumes the next rune
 // if it's from the valid set
 func (l *lexer) accept(valid string) bool {
-	if strings.IndexRune(valid, l.next()) >= 0 {
+	if strings.ContainsRune(valid, l.next()) {
 		return true
 	}
 	l.backup()
@@ -176,7 +176,7 @@ func (l *lexer) accept(valid string) bool {
 
 // acceptRun consumes a run of runes from the valid set
 func (l *lexer) acceptRun(valid string) {
-	for strings.IndexRune(valid, l.next()) >= 0 {
+	for strings.ContainsRune(valid, l.next()) {
 	}
 	l.backup()
 }
@@ -216,17 +216,17 @@ func lexFile(l *lexer) stateFn {
 
 func lexInDocument(l *lexer) stateFn {
 	r := l.peek()
-	switch {
-	case r == 0:
+	switch r {
+	case 0:
 		l.emit(itemEOF)
 		return nil
-	case r == '\n':
+	case '\n':
 		return lexIndent
-	case r == '\t':
+	case '\t':
 		panic("Lex error: document has a horizontal tab which is currently not supported\n")
-	case r == '-':
+	case '-':
 		return lexList
-	case r == ':':
+	case ':':
 		l.next()
 		l.emit(itemColon)
 		return lexInDocument

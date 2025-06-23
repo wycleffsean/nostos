@@ -57,6 +57,7 @@ func NewHandler(ctx context.Context, server protocol.Server, logger *zap.Logger)
 func (h Handler) Initialize(ctx context.Context, params *protocol.InitializeParams) (result *protocol.InitializeResult, err error) {
 	h.state.mu.Lock()
 	// TODO - rootURI is deprecated, use WorkspaceFolders instead
+	//nolint:staticcheck // keep compatibility with older clients
 	if params.RootURI != "" {
 		h.state.projectRoot = uri.URI(params.RootURI)
 	} else {
