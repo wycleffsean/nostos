@@ -14,6 +14,8 @@ type ResourceType struct {
 	Kind       string
 	Metadata   map[string]interface{}
 	Spec       map[string]interface{}
+	// Dependencies lists other resources this resource relies on by ID.
+	Dependencies []string
 }
 
 // Plan represents a unified plan graph that includes both the current cluster state and user-defined resources.
