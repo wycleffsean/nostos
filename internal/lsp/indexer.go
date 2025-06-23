@@ -110,8 +110,9 @@ func (a *indexer) reindex() {
 }
 
 func (a *indexer) currentSymbolTable() *lang.SymbolTable {
-	if v := a.state.symbolTable.Load(); v != nil {
-		return v.(*lang.SymbolTable)
+	st := a.state.symbolTable.Load()
+	if st != nil {
+		return st
 	}
 	return nil
 }
