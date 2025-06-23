@@ -17,6 +17,7 @@ type FieldDefinition struct {
 	Name        string // Name of the field
 	Type        string // Data type of the field (e.g., "string", "int", "object", "[]<type>" for arrays)
 	Description string
+	Required    bool              // Indicates if the field must appear on the object
 	SubFields   []FieldDefinition // Nested fields if this field is an object (one level deep)
 }
 

@@ -68,6 +68,11 @@ func (r *Registry) ListTypes() []TypeDefinition {
 	return result
 }
 
+// TypeDefinitions is an alias for ListTypes for clarity in callers.
+func (r *Registry) TypeDefinitions() []TypeDefinition {
+	return r.ListTypes()
+}
+
 /*
 Evaluation of k8s.io/apimachinery/pkg/util/managedfields.TypeConverter:
 
