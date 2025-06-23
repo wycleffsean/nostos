@@ -1,4 +1,4 @@
-package lsp_test
+package lsp
 
 import (
 	"context"
@@ -10,8 +10,6 @@ import (
 	"go.lsp.dev/protocol"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
-
-	lsp "github.com/wycleffsean/nostos/internal/lsp"
 )
 
 // testStreamServer adapts the lsp.StartServer logic for in-memory streams.
@@ -19,7 +17,7 @@ type testStreamServer struct{ logger *zap.Logger }
 
 func (t testStreamServer) ServeStream(ctx context.Context, conn jsonrpc2.Conn) error {
 	logger := t.logger
-	handler, ctx, err := lsp.NewHandler(ctx, protocol.ServerDispatcher(conn, logger), logger)
+	handler, ctx, err := NewHandler(ctx, protocol.ServerDispatcher(conn, logger), logger)
 	if err != nil {
 		return err
 	}
@@ -47,7 +45,11 @@ func TestInitializeAndInitialized(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Initialize failed: %v", err)
 	}
-	if res == nil || !res.Capabilities.DefinitionProvider {
+	if res == nil {
+		t.Fatal("initialize returned nil")
+	}
+	dp, ok := res.Capabilities.DefinitionProvider.(bool)
+	if !ok || !dp {
 		t.Fatalf("unexpected initialize result: %#v", res)
 	}
 

@@ -151,3 +151,13 @@ func (h Handler) Definition(ctx context.Context, params *protocol.DefinitionPara
 		}, nil
 	}
 }
+
+func (h Handler) Shutdown(ctx context.Context) (err error) {
+	log.Debug("###### Shutdown")
+	return nil
+}
+
+func (h Handler) Exit(ctx context.Context) (err error) {
+	log.Debug("###### Exit")
+	return nil
+}
