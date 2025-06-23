@@ -276,6 +276,7 @@ func init() {
 	tokenMap = make(map[itemType]tokenMapping)
 	tokenMap[itemError] = tokenMapping{precedenceCall, nullDenotationUnhandled, leftDenotationUnhandled}
 	tokenMap[itemColon] = tokenMapping{precedenceCall, nullDenotationUnhandled, _map}
+	tokenMap[itemList] = tokenMapping{precedenceLowest, _list, leftDenotationUnhandled}
 	tokenMap[itemString] = tokenMapping{precedenceLowest, _string, leftDenotationUnhandled}
 	tokenMap[itemSymbol] = tokenMapping{precedenceLowest, symbol, leftDenotationUnhandled}
 }
@@ -422,4 +423,21 @@ func _map(p *parser, key node) node {
 	m[*key.(*Symbol)] = value
 
 	return &m
+}
+
+func _list(p *parser) node {
+	var l List
+	if prior, ok := p.priorNode.(*List); ok && p.currentIndent == p.priorIndent {
+		l = *prior
+	} else {
+		l = make([]node, 0)
+	}
+
+	value := p.parseExpression(precedenceEquality)
+	if err, ok := value.(errorNode); ok {
+		return err
+	}
+
+	l = append(l, value)
+	return &l
 }

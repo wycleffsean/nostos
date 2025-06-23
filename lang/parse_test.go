@@ -122,3 +122,32 @@ func TestParseYamlNestedMaps(t *testing.T) {
 		t.Errorf("can't cast to Map: %v", got)
 	}
 }
+
+func TestParseYamlSimpleList(t *testing.T) {
+	got := parseString(`- "foo"`)
+
+	wanted := List{&String{Position{}, "foo"}}
+
+	if l, ok := got.(*List); ok {
+		if !reflect.DeepEqual(*l, wanted) {
+			t.Errorf("lists aren't equal - expected: %v got: %v", wanted, *l)
+		}
+	} else {
+		t.Errorf("can't cast to List: %v", got)
+	}
+}
+
+func TestParseYamlMultiList(t *testing.T) {
+	got := parseString(`- "foo"
+- "bar"`)
+
+	wanted := List{&String{Position{}, "foo"}, &String{Position{}, "bar"}}
+
+	if l, ok := got.(*List); ok {
+		if !reflect.DeepEqual(*l, wanted) {
+			t.Errorf("lists aren't equal - expected: %v got: %v", wanted, *l)
+		}
+	} else {
+		t.Errorf("can't cast to List: %v", got)
+	}
+}
