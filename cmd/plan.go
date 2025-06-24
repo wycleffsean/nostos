@@ -1,60 +1,50 @@
 package cmd
 
 import (
-	// "fmt"
-	// "log"
+	"fmt"
+	"os"
 
+	"github.com/fatih/color"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
-	// "github.com/wycleffsean/nostos/pkg/kube"
-	// "github.com/wycleffsean/nostos/pkg/types"
-	// "github.com/wycleffsean/nostos/pkg/planner"
+
+	"github.com/wycleffsean/nostos/pkg/planner"
 )
 
-// planCmd represents the plan command.
+var planColor bool
+
 var planCmd = &cobra.Command{
 	Use:   "plan",
-	Short: "Compute the changes to be applied without making any changes.",
-	Long:  `The plan command calculates the modifications to be made to your cluster, letting you preview what will happen before actually applying changes.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		// Get Kubernetes client configuration using the helper defined in root.go.
-		// config, err := GetClientConfig()
-		// if err != nil {
-		// 	log.Fatalf("No kubeconfig ¯\\_(ツ)_/¯: %v", err)
-		// }
+	Short: "Generate an execution plan",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		clusterPlan, err := planner.BuildPlanFromCluster()
+		if err != nil {
+			return err
+		}
+		// TODO: load desired resources from user files once parser is implemented
+		var desired []planner.ResourceType
 
-		// registry, err := prepareTypeRegistry(config)
-		// if err != nil {
-		// 	log.Fatalf("fetching types failed: %v", err)
-		// }
-
-		// registry.Types.Range(func(key, value any) bool {
-		// 	fmt.Printf("key: %v\n", key)
-		// 	return true
-		// })
-
-		// // Build the plan from the cluster state.
-		// plan, err := planner.BuildPlanFromCluster(config)
-		// if err != nil {
-		// 	log.Fatalf("Error building plan from cluster: %v", err)
-		// }
-
-		// // Nicely print the plan results.
-		// fmt.Println("Plan:")
-		// if len(plan.Resources) == 0 {
-		// 	fmt.Println("No resources found.")
-		// 	return
-		// }
-		// for _, res := range plan.Resources {
-		// 	// Extract the resource name from metadata.
-		// 	name, ok := res.Metadata["name"].(string)
-		// 	if !ok {
-		// 		name = "unknown"
-		// 	}
-		// 	fmt.Printf("- Kind: %-20s API Version: %-10s Name: %s\n", res.Kind, res.APIVersion, name)
-		// }
+		diff := planner.DiffResources(clusterPlan.Resources, desired)
+		plan, err := planner.BuildPlanFromDiff(diff)
+		if err != nil {
+			return err
+		}
+		printPlan(plan, planColor || isatty.IsTerminal(os.Stdout.Fd()))
+		return nil
 	},
 }
 
 func init() {
+	planCmd.Flags().BoolVar(&planColor, "color", false, "force color output")
 	RootCmd.AddCommand(planCmd)
+}
+
+func printPlan(resources []planner.ResourceType, useColor bool) {
+	if !useColor {
+		color.NoColor = true
+	}
+	blue := color.New(color.FgCyan).SprintFunc()
+	for i, r := range resources {
+		fmt.Printf("%2d. %s\n", i+1, blue(planner.ResourceID(r)))
+	}
 }
