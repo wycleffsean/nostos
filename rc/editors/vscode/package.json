@@ -1,0 +1,28 @@
+{
+  "name": "nostos",
+  "displayName": "NostOS",
+  "description": "Syntax highlighting for NostOS configuration files.",
+  "version": "0.0.1",
+  "publisher": "nostos",
+  "engines": {
+    "vscode": "^1.50.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "nostos",
+        "aliases": ["NostOS", "nostos"],
+        "extensions": [".no"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "nostos",
+        "scopeName": "source.nostos",
+        "path": "./syntaxes/nostos.tmLanguage.json"
+      }
+    ]
+  }
+}
