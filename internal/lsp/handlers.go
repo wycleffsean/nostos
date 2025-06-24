@@ -338,11 +338,22 @@ func (h Handler) CodeAction(ctx context.Context, params *protocol.CodeActionPara
 	indent := node.Column - 1
 	insertLine := uint32(end + 1)
 	edits := []protocol.TextEdit{}
+
+	// If we're inserting after the last line and the document doesn't end
+	// with a newline, prefix the first insertion with one to avoid
+	// concatenating with the previous line's text.
+	lines := strings.Split(text, "\n")
+	prefix := ""
+	if int(insertLine) >= len(lines) && !strings.HasSuffix(text, "\n") {
+		prefix = "\n"
+	}
+
 	for _, f := range fields {
 		if _, ok := obj[f.Name]; ok {
 			continue
 		}
-		insertText := strings.Repeat(" ", indent) + f.Name + ":\n"
+		insertText := prefix + strings.Repeat(" ", indent) + f.Name + ":\n"
+		prefix = ""
 		edits = append(edits, protocol.TextEdit{
 			Range:   protocol.Range{Start: protocol.Position{Line: insertLine, Character: 0}, End: protocol.Position{Line: insertLine, Character: 0}},
 			NewText: insertText,
