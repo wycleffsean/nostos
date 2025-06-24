@@ -15,6 +15,7 @@ import (
 
 	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/pkg/types"
+	"github.com/wycleffsean/nostos/pkg/workspace"
 )
 
 var log *zap.Logger
@@ -68,6 +69,10 @@ func (h Handler) Initialize(ctx context.Context, params *protocol.InitializePara
 		h.state.projectRoot = uri.URI(params.RootPath)
 	}
 	h.state.mu.Unlock()
+
+	if h.state.projectRoot != "" {
+		workspace.Set(h.state.projectRoot.Filename())
+	}
 
 	log.Info("LSP initialized", zap.String("projectRoot", string(h.state.projectRoot)))
 

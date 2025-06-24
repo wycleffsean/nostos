@@ -8,6 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/wycleffsean/nostos/pkg/workspace"
 )
 
 // RootCmd is the base command for Nostos.
@@ -42,8 +44,14 @@ func init() {
 	// Global flags available for all commands
 	RootCmd.PersistentFlags().String("kubeconfig", "", "Path to kubeconfig file")
 	RootCmd.PersistentFlags().String("context", "", "Kubernetes context to use")
+	RootCmd.PersistentFlags().String("workspace-dir", "", "Nostos workspace directory")
 
 	// Bind flags to Viper for centralized config handling
 	cobra.CheckErr(viper.BindPFlag("kubeconfig", RootCmd.PersistentFlags().Lookup("kubeconfig")))
 	cobra.CheckErr(viper.BindPFlag("context", RootCmd.PersistentFlags().Lookup("context")))
+	cobra.CheckErr(viper.BindPFlag("workspace_dir", RootCmd.PersistentFlags().Lookup("workspace-dir")))
+
+	RootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		workspace.Set(viper.GetString("workspace_dir"))
+	}
 }
