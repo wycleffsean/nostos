@@ -330,7 +330,9 @@ func (p *parser) peek() *item {
 		select {
 		case tok, ok := <-p.tokens:
 			if !ok {
-				panic("lexer channel closed unexpectedly")
+				eof := &item{typ: itemEOF}
+				p.peeked = eof
+				return eof
 
 			}
 			// fmt.Printf("-> %v\n", tok)
