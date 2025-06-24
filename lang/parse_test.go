@@ -2,6 +2,7 @@ package lang
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -157,5 +158,28 @@ func TestParseFunction(t *testing.T) {
 	wanted := &Function{Param: &Symbol{Position{}, "x"}, Body: &Symbol{Position{}, "x"}}
 	if !reflect.DeepEqual(got, wanted) {
 		t.Errorf("function parse mismatch - expected: %#v got: %#v", wanted, got)
+	}
+}
+
+func TestParseHandlesLexerErrors(t *testing.T) {
+	// Input with an unterminated string should not cause panics
+	got := parseString("apiVersion: \"v1\"\nkind: \"Service")
+	err, ok := got.(*ParseError)
+	if !ok {
+		t.Fatalf("expected ParseError, got %T", got)
+	}
+	if !strings.Contains(err.Error(), "unterminated string") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestParseHandlesTabsGracefully(t *testing.T) {
+	got := parseString("foo:\tbar")
+	err, ok := got.(*ParseError)
+	if !ok {
+		t.Fatalf("expected ParseError, got %T", got)
+	}
+	if !strings.Contains(err.Error(), "horizontal tabs") {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

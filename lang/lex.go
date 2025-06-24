@@ -226,7 +226,7 @@ func lexInDocument(l *lexer) stateFn {
 	case '\n':
 		return lexIndent
 	case '\t':
-		panic("Lex error: document has a horizontal tab which is currently not supported\n")
+		return l.errorf("horizontal tabs are not supported")
 	case '-':
 		return lexList
 	case '(':
