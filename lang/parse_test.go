@@ -55,6 +55,30 @@ func TestParseString(t *testing.T) {
 	}
 }
 
+func TestParsePath(t *testing.T) {
+	got := parseString("../foo")
+	wanted := Path{Position{}, "../foo"}
+	if p, ok := got.(*Path); ok {
+		if !reflect.DeepEqual(*p, wanted) {
+			t.Errorf("got %#v, wanted %#v", *p, wanted)
+		}
+	} else {
+		t.Errorf("can't cast to Path: %v", got)
+	}
+}
+
+func TestParsePathAbsolute(t *testing.T) {
+	got := parseString("/etc/passwd")
+	wanted := Path{Position{}, "/etc/passwd"}
+	if p, ok := got.(*Path); ok {
+		if !reflect.DeepEqual(*p, wanted) {
+			t.Errorf("got %#v, wanted %#v", *p, wanted)
+		}
+	} else {
+		t.Errorf("can't cast to Path: %v", got)
+	}
+}
+
 //// Yaml
 
 func TestParseYamlSimpleMap(t *testing.T) {
