@@ -1,0 +1,12 @@
+{
+  "scopeName": "source.nostos",
+  "name": "NostOS",
+  "patterns": [
+    { "include": "source.yaml" },
+    {
+      "match": "=>",
+      "name": "keyword.operator.lambda.nostos"
+    }
+  ],
+  "fileTypes": ["no"]
+}
