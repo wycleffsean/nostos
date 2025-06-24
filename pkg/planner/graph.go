@@ -20,9 +20,6 @@ func TopologicalSort(resources []ResourceType) ([]ResourceType, error) {
 	for _, r := range resources {
 		id := ResourceID(r)
 		nodes[id] = r
-		if len(r.Dependencies) == 0 {
-			indegree[id] = indegree[id]
-		}
 		for _, dep := range r.Dependencies {
 			indegree[id]++
 			adj[dep] = append(adj[dep], id)
