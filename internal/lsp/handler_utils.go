@@ -3,6 +3,7 @@ package lsp
 import (
 	"context"
 	"github.com/wycleffsean/nostos/pkg/kube"
+	"github.com/wycleffsean/nostos/pkg/types"
 	"go.lsp.dev/protocol"
 )
 
@@ -17,15 +18,8 @@ func runRegistryWorker(ctx context.Context, state *ServerState) {
 
 	registry, err := kube.FetchAndFillRegistry() // TODO: receives ctx
 	if err != nil {
-		log.Sugar().Errorw("FetchAndFillRegistry failed", "error", err)
-		if client != nil {
-			_ = client.ShowMessage(ctx, &protocol.ShowMessageParams{
-				Type:    protocol.MessageTypeError,
-				Message: "Failed to fetch Kubernetes resources: " + err.Error(),
-			})
-		}
-		close(state.registryReady) // still close to unblock waiters
-		return
+		log.Sugar().Warnw("FetchAndFillRegistry failed, using built-in registry", "error", err)
+		registry = types.DefaultRegistry()
 	}
 
 	log.Sugar().Infow("Registry ready")

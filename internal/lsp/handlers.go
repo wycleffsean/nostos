@@ -2,12 +2,15 @@ package lsp
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"sync/atomic"
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 	"go.uber.org/zap"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/pkg/types"
@@ -70,10 +73,10 @@ func (h Handler) Initialize(ctx context.Context, params *protocol.InitializePara
 	return &protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
 			// CallHierarchyProvider:            h,
-			// CodeActionProvider:               nil,
+			CodeActionProvider: true,
 			// CodeLensProvider:                 &protocol.CodeLensOptions{},
 			// ColorProvider:                    nil,
-			// CompletionProvider:               &protocol.CompletionOptions{},
+			CompletionProvider: &protocol.CompletionOptions{},
 			// DeclarationProvider:              nil,
 			DefinitionProvider: true,
 			// DocumentFormattingProvider:       nil,
@@ -85,7 +88,7 @@ func (h Handler) Initialize(ctx context.Context, params *protocol.InitializePara
 			// ExecuteCommandProvider:           &protocol.ExecuteCommandOptions{},
 			// Experimental:                     nil,
 			// FoldingRangeProvider:             nil,
-			// HoverProvider:                    h,
+			HoverProvider: true,
 			// ImplementationProvider:           nil,
 			// LinkedEditingRangeProvider:       err,
 			// MonikerProvider:                  nil,
@@ -182,4 +185,160 @@ func (h Handler) Shutdown(ctx context.Context) (err error) {
 func (h Handler) Exit(ctx context.Context) (err error) {
 	log.Debug("###### Exit")
 	return nil
+}
+
+// Hover returns basic information about the Kubernetes resource at the current position.
+func (h Handler) Hover(ctx context.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
+	log.Debug("###### Hover")
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	h.state.mu.RLock()
+	text, ok := h.state.documents[params.TextDocument.URI]
+	h.state.mu.RUnlock()
+	if !ok {
+		return nil, nil
+	}
+
+	kind, apiVersion := extractKindAPIVersion(text)
+	reg := h.state.registry
+	if reg == nil {
+		reg = types.DefaultRegistry()
+	}
+	td, found := reg.GetType("", apiVersion, kind)
+	if !found {
+		return nil, nil
+	}
+
+	msg := td.Kind + " (" + td.Version + ")"
+	if td.Description != "" {
+		msg += " - " + td.Description
+	}
+	contents := protocol.MarkupContent{Kind: protocol.Markdown, Value: msg}
+	return &protocol.Hover{Contents: contents}, nil
+}
+
+// Completion provides simple completions for kind and apiVersion fields.
+func (h Handler) Completion(ctx context.Context, params *protocol.CompletionParams) (*protocol.CompletionList, error) {
+	log.Debug("###### Completion")
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	h.state.mu.RLock()
+	text, ok := h.state.documents[params.TextDocument.URI]
+	h.state.mu.RUnlock()
+	if !ok {
+		return nil, nil
+	}
+
+	lines := strings.Split(text, "\n")
+	if int(params.Position.Line) >= len(lines) {
+		return nil, nil
+	}
+	line := lines[params.Position.Line][:int(params.Position.Character)]
+	line = strings.TrimSpace(line)
+
+	reg := h.state.registry
+	if reg == nil {
+		reg = types.DefaultRegistry()
+	}
+
+	items := []protocol.CompletionItem{}
+	if strings.HasPrefix(line, "kind:") {
+		for _, td := range reg.TypeDefinitions() {
+			items = append(items, protocol.CompletionItem{Label: td.Kind})
+		}
+	} else if strings.HasPrefix(line, "apiVersion:") {
+		kind, _ := extractKindAPIVersion(text)
+		versions := []string{}
+		if kind != "" {
+			for _, td := range reg.TypeDefinitions() {
+				if td.Kind == kind {
+					versions = append(versions, td.Version)
+				}
+			}
+		}
+		if len(versions) == 0 {
+			for _, td := range reg.TypeDefinitions() {
+				versions = append(versions, td.Version)
+			}
+		}
+		for _, v := range versions {
+			items = append(items, protocol.CompletionItem{Label: v})
+		}
+	}
+	return &protocol.CompletionList{IsIncomplete: false, Items: items}, nil
+}
+
+// CodeAction inserts any missing required fields for the detected resource type.
+func (h Handler) CodeAction(ctx context.Context, params *protocol.CodeActionParams) ([]protocol.CodeAction, error) {
+	log.Debug("###### CodeAction")
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	h.state.mu.RLock()
+	text, ok := h.state.documents[params.TextDocument.URI]
+	h.state.mu.RUnlock()
+	if !ok {
+		return nil, nil
+	}
+
+	kind, apiVersion := extractKindAPIVersion(text)
+	reg := h.state.registry
+	if reg == nil {
+		reg = types.DefaultRegistry()
+	}
+	td, found := reg.GetType("", apiVersion, kind)
+	if !found {
+		return nil, nil
+	}
+
+	doc := map[string]interface{}{}
+	_ = yaml.Unmarshal([]byte(text), &doc)
+	edits := []protocol.TextEdit{}
+
+	lastLine := uint32(len(strings.Split(text, "\n")))
+	for _, f := range td.Fields {
+		if !f.Required {
+			continue
+		}
+		if _, ok := doc[f.Name]; ok {
+			continue
+		}
+		insertText := f.Name + ":\n"
+		edits = append(edits, protocol.TextEdit{
+			Range:   protocol.Range{Start: protocol.Position{Line: lastLine, Character: 0}, End: protocol.Position{Line: lastLine, Character: 0}},
+			NewText: insertText,
+		})
+	}
+	if len(edits) == 0 {
+		return nil, nil
+	}
+	changeMap := map[protocol.DocumentURI][]protocol.TextEdit{params.TextDocument.URI: edits}
+	ca := protocol.CodeAction{
+		Title: "Fill required fields",
+		Kind:  protocol.QuickFix,
+		Edit:  &protocol.WorkspaceEdit{Changes: changeMap},
+	}
+	return []protocol.CodeAction{ca}, nil
+}
+
+// extractKindAPIVersion parses a manifest and returns its kind and apiVersion.
+func extractKindAPIVersion(text string) (string, string) {
+	var m map[string]interface{}
+	if err := yaml.Unmarshal([]byte(text), &m); err != nil {
+		return "", ""
+	}
+	kind, _ := m["kind"].(string)
+	apiVersion, _ := m["apiVersion"].(string)
+	return kind, apiVersion
 }

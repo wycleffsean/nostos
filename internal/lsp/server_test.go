@@ -3,6 +3,7 @@ package lsp
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -144,26 +145,26 @@ func TestDidChange(t *testing.T) {
 			URI:        docURI,
 			LanguageID: "nostos",
 			Version:    1,
-			Text:       "a: 1\n",
+			Text:       "a: \"1\"\n",
 		},
 	}
 	if err := client.DidOpen(ctx, openParams); err != nil {
 		t.Fatalf("DidOpen failed: %v", err)
 	}
-	waitForDocument(t, env.handler, docURI, "a: 1\n")
+	waitForDocument(t, env.handler, docURI, "a: \"1\"\n")
 
 	changeParams := &protocol.DidChangeTextDocumentParams{
 		TextDocument: protocol.VersionedTextDocumentIdentifier{
 			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: docURI},
 			Version:                2,
 		},
-		ContentChanges: []protocol.TextDocumentContentChangeEvent{{Text: "a: 2\n"}},
+		ContentChanges: []protocol.TextDocumentContentChangeEvent{{Text: "a: \"2\"\n"}},
 	}
 	if err := client.DidChange(ctx, changeParams); err != nil {
 		t.Fatalf("DidChange failed: %v", err)
 	}
 
-	waitForDocument(t, env.handler, docURI, "a: 2\n")
+	waitForDocument(t, env.handler, docURI, "a: \"2\"\n")
 }
 
 func TestDefinition(t *testing.T) {
@@ -193,5 +194,81 @@ func TestDefinition(t *testing.T) {
 	}}
 	if len(locs) != 1 || locs[0] != want[0] {
 		t.Fatalf("unexpected definition result: %#v", locs)
+	}
+}
+
+func TestHoverCompletionAndCodeAction(t *testing.T) {
+	env := setup(t)
+	defer env.teardown()
+
+	client := env.client
+	ctx := env.ctx
+
+	_, err := client.Initialize(ctx, &protocol.InitializeParams{RootURI: "file:///tmp"})
+	if err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+	if err := client.Initialized(ctx, &protocol.InitializedParams{}); err != nil {
+		t.Fatalf("Initialized failed: %v", err)
+	}
+
+	docURI := protocol.DocumentURI("file:///svc.yaml")
+	openParams := &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        docURI,
+			LanguageID: "nostos",
+			Version:    1,
+			Text:       "apiVersion: v1\nkind: Service\n",
+		},
+	}
+	if err := client.DidOpen(ctx, openParams); err != nil {
+		t.Fatalf("DidOpen failed: %v", err)
+	}
+
+	hover, err := client.Hover(ctx, &protocol.HoverParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 0, Character: 0},
+		},
+	})
+	if err != nil || hover == nil {
+		t.Fatalf("Hover failed: %v", err)
+	}
+	if !strings.Contains(hover.Contents.Value, "Service") {
+		t.Fatalf("unexpected hover: %#v", hover)
+	}
+
+	comp, err := client.Completion(ctx, &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+			Position:     protocol.Position{Line: 1, Character: 6},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Completion failed: %v", err)
+	}
+	found := false
+	for _, item := range comp.Items {
+		if item.Label == "Service" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("completion did not contain Service: %#v", comp.Items)
+	}
+
+	acts, err := client.CodeAction(ctx, &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 0, Character: 0},
+			End:   protocol.Position{Line: 0, Character: 0},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CodeAction failed: %v", err)
+	}
+	if len(acts) == 0 {
+		t.Fatalf("expected code action")
 	}
 }
