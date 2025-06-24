@@ -225,6 +225,7 @@ func TestHoverCompletionAndCodeAction(t *testing.T) {
 	if err := client.DidOpen(ctx, openParams); err != nil {
 		t.Fatalf("DidOpen failed: %v", err)
 	}
+	waitForDocument(t, env.handler, docURI, openParams.TextDocument.Text)
 
 	hover, err := client.Hover(ctx, &protocol.HoverParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
