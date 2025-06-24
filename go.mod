@@ -3,6 +3,7 @@ module github.com/wycleffsean/nostos
 go 1.23.1
 
 require (
+	github.com/briandowns/spinner v1.23.2
 	github.com/fatih/color v1.14.1
 	github.com/google/btree v1.1.3
 	github.com/mattn/go-isatty v0.0.17
@@ -13,6 +14,7 @@ require (
 	go.lsp.dev/uri v0.3.0
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.27.0
+	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/apiextensions-apiserver v0.32.2
 	k8s.io/apimachinery v0.32.2
 	k8s.io/client-go v0.32.2
@@ -68,7 +70,6 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.32.2 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
