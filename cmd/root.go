@@ -47,7 +47,7 @@ func init() {
 	RootCmd.PersistentFlags().String("kubeconfig", "", "Path to kubeconfig file")
 	RootCmd.PersistentFlags().String("context", "", "Kubernetes context to use")
 	RootCmd.PersistentFlags().String("workspace-dir", "", "Nostos workspace directory")
-	RootCmd.PersistentFlags().BoolVar(&ignoreSystemNamespace, "ignore-system-namespace", false, "Ignore resources in the kube-system namespace")
+	RootCmd.PersistentFlags().BoolVar(&ignoreSystemNamespace, "ignore-system-namespace", true, "Ignore resources in the kube-system namespace")
 
 	// Bind flags to Viper for centralized config handling
 	cobra.CheckErr(viper.BindPFlag("kubeconfig", RootCmd.PersistentFlags().Lookup("kubeconfig")))
