@@ -1,10 +1,19 @@
 package types
 
+import "os"
+
 // DefaultRegistry returns a Registry populated with a minimal set of built-in
 // Kubernetes type definitions. The data here is intentionally small so the
 // language server can provide basic completions and hover information even when
 // connecting to a cluster is not possible.
 func DefaultRegistry() *Registry {
+    // Load the baked kubespec dataset when requested.
+    if os.Getenv("NOSTOS_USE_KUBESPEC") != "" {
+		if r, err := KubespecRegistry(); err == nil {
+			return r
+		}
+	}
+
 	r := NewRegistry()
 
 	r.AddType(TypeDefinition{

@@ -18,6 +18,7 @@ type FieldDefinition struct {
 	Type        string // Data type of the field (e.g., "string", "int", "object", "[]<type>" for arrays)
 	Description string
 	Required    bool              // Indicates if the field must appear on the object
+	Since       string            // Kubernetes version when this field was introduced (empty if unknown)
 	SubFields   []FieldDefinition // Nested fields if this field is an object (one level deep)
 }
 
