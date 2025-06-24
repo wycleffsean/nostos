@@ -218,6 +218,15 @@ type Symbol struct {
 
 func (s *Symbol) Pos() Position { return s.Position }
 
+// -----------------------------------------------------
+// Path literal
+type Path struct {
+	Position Position
+	Text     string
+}
+
+func (p *Path) Pos() Position { return p.Position }
+
 // func (s *Symbol) End() Position { return pos(int(s.Position) + len(s.Text)) }
 
 // -----------------------------------------------------
@@ -278,6 +287,7 @@ func init() {
 	tokenMap[itemArrow] = tokenMapping{precedenceCall, nullDenotationUnhandled, _function}
 	tokenMap[itemList] = tokenMapping{precedenceLowest, _list, leftDenotationUnhandled}
 	tokenMap[itemString] = tokenMapping{precedenceLowest, _string, leftDenotationUnhandled}
+	tokenMap[itemPath] = tokenMapping{precedenceLowest, _path, leftDenotationUnhandled}
 	tokenMap[itemSymbol] = tokenMapping{precedenceLowest, symbol, leftDenotationUnhandled}
 }
 
@@ -405,6 +415,10 @@ func (p *parser) parseExpression(precedence Precedence) node {
 
 func _string(p *parser) node {
 	return &String{Position{}, p.current.val}
+}
+
+func _path(p *parser) node {
+	return &Path{Position{}, p.current.val}
 }
 
 func symbol(p *parser) node {

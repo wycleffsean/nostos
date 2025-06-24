@@ -88,6 +88,18 @@ func TestLexStringWithSymbols(t *testing.T) {
 	assertScalar(t, got, itemString, "apps/v1", 0)
 }
 
+func TestLexPathAbsolute(t *testing.T) {
+	_, items := NewStringLexer("/etc/passwd")
+	got := single(t, items)
+	assertScalar(t, got, itemPath, "/etc/passwd", 0)
+}
+
+func TestLexPathRelative(t *testing.T) {
+	_, items := NewStringLexer("../foo")
+	got := single(t, items)
+	assertScalar(t, got, itemPath, "../foo", 0)
+}
+
 func TestLexInteger(t *testing.T) {
 	_, items := NewStringLexer("123")
 	got := single(t, items)

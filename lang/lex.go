@@ -36,6 +36,7 @@ const (
 	// itemRawString
 	// itemRightMeta
 	itemString
+	itemPath
 	itemSymbol
 	// itemText
 )
@@ -212,6 +213,27 @@ func isValidKey(r rune) bool {
 	return isAlphaNumeric(r) || r == '/'
 }
 
+func isPathStart(l *lexer) bool {
+	if strings.HasPrefix(l.input[l.pos:], "../") {
+		return true
+	}
+	if strings.HasPrefix(l.input[l.pos:], "./") {
+		return true
+	}
+	if strings.HasPrefix(l.input[l.pos:], "/") {
+		return true
+	}
+	return false
+}
+
+func isPathRune(r rune) bool {
+	switch r {
+	case 0, ' ', '\n', '\t', ':', '(', ')':
+		return false
+	}
+	return true
+}
+
 func lexFile(l *lexer) stateFn {
 	_ = l
 	return lexInDocument
@@ -227,6 +249,15 @@ func lexInDocument(l *lexer) stateFn {
 		return lexIndent
 	case '\t':
 		return l.errorf("horizontal tabs are not supported")
+	case '.':
+		if isPathStart(l) {
+			return lexPath
+		}
+		l.next()
+		l.emit(itemDot)
+		return lexInDocument
+	case '/':
+		return lexPath
 	case '-':
 		return lexList
 	case '(':
@@ -356,5 +387,13 @@ func lexNumber(l *lexer) stateFn {
 			l.input[l.start:l.pos])
 	}
 	l.emit(itemNumber)
+	return lexInDocument
+}
+
+func lexPath(l *lexer) stateFn {
+	for isPathRune(l.peek()) {
+		l.next()
+	}
+	l.emit(itemPath)
 	return lexInDocument
 }
