@@ -276,6 +276,7 @@ func init() {
 	tokenMap = make(map[itemType]tokenMapping)
 	tokenMap[itemError] = tokenMapping{precedenceCall, nullDenotationUnhandled, leftDenotationUnhandled}
 	tokenMap[itemColon] = tokenMapping{precedenceCall, nullDenotationUnhandled, _map}
+	tokenMap[itemArrow] = tokenMapping{precedenceCall, nullDenotationUnhandled, _function}
 	tokenMap[itemList] = tokenMapping{precedenceLowest, _list, leftDenotationUnhandled}
 	tokenMap[itemString] = tokenMapping{precedenceLowest, _string, leftDenotationUnhandled}
 	tokenMap[itemSymbol] = tokenMapping{precedenceLowest, symbol, leftDenotationUnhandled}
@@ -440,4 +441,19 @@ func _list(p *parser) node {
 
 	l = append(l, value)
 	return &l
+}
+
+func _function(p *parser, param node) node {
+	sym, ok := param.(*Symbol)
+	if !ok {
+		return p._error("function parameter must be a symbol")
+	}
+
+	body := p.parseExpression(precedenceEquality)
+	if err, ok := body.(errorNode); ok {
+		return err
+	}
+
+	f := &Function{Param: sym, Body: body}
+	return f
 }

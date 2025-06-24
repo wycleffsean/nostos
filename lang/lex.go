@@ -21,6 +21,9 @@ const (
 	itemEOF
 	itemList
 	itemColon
+	itemArrow      // =>
+	itemLeftParen  // (
+	itemRightParen // )
 	// itemElse
 	// itemEnd
 	// itemField
@@ -226,6 +229,21 @@ func lexInDocument(l *lexer) stateFn {
 		panic("Lex error: document has a horizontal tab which is currently not supported\n")
 	case '-':
 		return lexList
+	case '(':
+		l.next()
+		l.emit(itemLeftParen)
+		return lexInDocument
+	case ')':
+		l.next()
+		l.emit(itemRightParen)
+		return lexInDocument
+	case '=':
+		l.next()
+		if l.next() == '>' {
+			l.emit(itemArrow)
+			return lexInDocument
+		}
+		return l.errorf("unexpected '='")
 	case ':':
 		l.next()
 		l.emit(itemColon)

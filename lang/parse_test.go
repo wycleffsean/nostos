@@ -151,3 +151,11 @@ func TestParseYamlMultiList(t *testing.T) {
 		t.Errorf("can't cast to List: %v", got)
 	}
 }
+
+func TestParseFunction(t *testing.T) {
+	got := parseString("x => x")
+	wanted := &Function{Param: &Symbol{Position{}, "x"}, Body: &Symbol{Position{}, "x"}}
+	if !reflect.DeepEqual(got, wanted) {
+		t.Errorf("function parse mismatch - expected: %#v got: %#v", wanted, got)
+	}
+}
