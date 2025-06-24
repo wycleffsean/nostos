@@ -159,3 +159,11 @@ func TestParseFunction(t *testing.T) {
 		t.Errorf("function parse mismatch - expected: %#v got: %#v", wanted, got)
 	}
 }
+
+func TestParseHandlesLexerErrors(t *testing.T) {
+	// Input with an unterminated string should not cause panics
+	got := parseString("apiVersion: \"v1\"\nkind: \"Service")
+	if _, ok := got.(*ParseError); !ok {
+		t.Errorf("expected ParseError, got %T", got)
+	}
+}

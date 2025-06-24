@@ -31,7 +31,6 @@ package lang
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 )
@@ -312,7 +311,7 @@ func (p *parser) Parse() node {
 		// }
 		root = res
 		if err, ok := root.(errorNode); ok {
-			log.Fatalf("Parse error: %v\n current token: %v\n next token: %v", err, p.current, p.peek())
+			return err
 		}
 
 	}
