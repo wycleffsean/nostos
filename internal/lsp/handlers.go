@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -302,21 +303,48 @@ func (h Handler) CodeAction(ctx context.Context, params *protocol.CodeActionPara
 		return nil, nil
 	}
 
-	doc := map[string]interface{}{}
-	_ = yaml.Unmarshal([]byte(text), &doc)
-	edits := []protocol.TextEdit{}
+	var root yaml.Node
+	if err := yaml.Unmarshal([]byte(text), &root); err != nil {
+		return nil, nil
+	}
 
-	lastLine := uint32(len(strings.Split(text, "\n")))
-	for _, f := range td.Fields {
-		if !f.Required {
+	path, node := findPathAndNode(&root, int(params.Range.Start.Line))
+	if node.Kind != yaml.MappingNode {
+		if node.Kind == yaml.ScalarNode && node.Value == "" && len(node.Content) == 0 && len(path) > 0 {
+			// treat empty scalar as an empty mapping node
+		} else {
+			if len(path) == 0 {
+				return nil, nil
+			}
+			path = path[:len(path)-1]
+			node = findNodeByPath(&root, path)
+			if node == nil || node.Kind != yaml.MappingNode {
+				return nil, nil
+			}
+		}
+	}
+
+	fields := getFields(td, path)
+	if len(fields) == 0 {
+		return nil, nil
+	}
+
+	obj := map[string]interface{}{}
+	if node.Kind == yaml.MappingNode {
+		_ = node.Decode(&obj)
+	}
+
+	_, end := nodeRange(node)
+	indent := node.Column - 1
+	insertLine := uint32(end + 1)
+	edits := []protocol.TextEdit{}
+	for _, f := range fields {
+		if _, ok := obj[f.Name]; ok {
 			continue
 		}
-		if _, ok := doc[f.Name]; ok {
-			continue
-		}
-		insertText := f.Name + ":\n"
+		insertText := strings.Repeat(" ", indent) + f.Name + ":\n"
 		edits = append(edits, protocol.TextEdit{
-			Range:   protocol.Range{Start: protocol.Position{Line: lastLine, Character: 0}, End: protocol.Position{Line: lastLine, Character: 0}},
+			Range:   protocol.Range{Start: protocol.Position{Line: insertLine, Character: 0}, End: protocol.Position{Line: insertLine, Character: 0}},
 			NewText: insertText,
 		})
 	}
@@ -341,4 +369,122 @@ func extractKindAPIVersion(text string) (string, string) {
 	kind, _ := m["kind"].(string)
 	apiVersion, _ := m["apiVersion"].(string)
 	return kind, apiVersion
+}
+
+// nodeRange returns the inclusive start and end line numbers (0-indexed) that a yaml node spans.
+func nodeRange(n *yaml.Node) (start, end int) {
+	start = n.Line - 1
+	end = start
+	var walk func(*yaml.Node)
+	walk = func(nd *yaml.Node) {
+		if nd.Line-1 > end {
+			end = nd.Line - 1
+		}
+		for _, c := range nd.Content {
+			walk(c)
+		}
+	}
+	walk(n)
+	return
+}
+
+// findNodeByPath traverses the yaml AST and returns the node for the given field path.
+func findNodeByPath(root *yaml.Node, path []string) *yaml.Node {
+	if len(root.Content) == 0 {
+		return nil
+	}
+	node := root.Content[0]
+	for _, p := range path {
+		if node.Kind != yaml.MappingNode {
+			return nil
+		}
+		found := false
+		for i := 0; i < len(node.Content); i += 2 {
+			k := node.Content[i]
+			v := node.Content[i+1]
+			if k.Value == p {
+				node = v
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil
+		}
+	}
+	return node
+}
+
+// findPathAndNode locates the field path and node at a given line number.
+func findPathAndNode(root *yaml.Node, line int) ([]string, *yaml.Node) {
+	var resPath []string
+	var resNode *yaml.Node
+	var found bool
+	var search func(n *yaml.Node, path []string)
+	search = func(n *yaml.Node, path []string) {
+		if found {
+			return
+		}
+		if n.Kind == yaml.MappingNode {
+			for i := 0; i < len(n.Content); i += 2 {
+				k := n.Content[i]
+				v := n.Content[i+1]
+				if line == k.Line-1 {
+					resPath = append(path, k.Value)
+					resNode = v
+					found = true
+					return
+				}
+				s, e := nodeRange(v)
+				if line >= s && line <= e {
+					search(v, append(path, k.Value))
+					if found {
+						return
+					}
+				}
+			}
+		} else if n.Kind == yaml.SequenceNode {
+			for i, c := range n.Content {
+				s, e := nodeRange(c)
+				if line >= s && line <= e {
+					search(c, append(path, fmt.Sprintf("[%d]", i)))
+					if found {
+						return
+					}
+				}
+			}
+		}
+	}
+	for _, doc := range root.Content {
+		s, e := nodeRange(doc)
+		if line >= s && line <= e {
+			search(doc, nil)
+			if found {
+				break
+			}
+		}
+	}
+	if !found {
+		return nil, root
+	}
+	return resPath, resNode
+}
+
+// getFields returns the FieldDefinitions for a nested path within a TypeDefinition.
+func getFields(td types.TypeDefinition, path []string) []types.FieldDefinition {
+	fields := td.Fields
+	for _, p := range path {
+		found := false
+		for _, f := range fields {
+			if f.Name == p {
+				fields = f.SubFields
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil
+		}
+	}
+	return fields
 }
