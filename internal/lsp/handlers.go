@@ -69,6 +69,11 @@ func (h Handler) Initialize(ctx context.Context, params *protocol.InitializePara
 	}
 	h.state.mu.Unlock()
 
+	// Index existing workspace files
+	if h.state.indexer != nil {
+		h.state.indexer.loadWorkspace()
+	}
+
 	log.Info("LSP initialized", zap.String("projectRoot", string(h.state.projectRoot)))
 
 	return &protocol.InitializeResult{
@@ -85,7 +90,7 @@ func (h Handler) Initialize(ctx context.Context, params *protocol.InitializePara
 			// DocumentLinkProvider:             &protocol.DocumentLinkOptions{},
 			// DocumentOnTypeFormattingProvider: &protocol.DocumentOnTypeFormattingOptions{},
 			// DocumentRangeFormattingProvider:  nil,
-			// DocumentSymbolProvider:           nil,
+			DocumentSymbolProvider: true,
 			// ExecuteCommandProvider:           &protocol.ExecuteCommandOptions{},
 			// Experimental:                     nil,
 			// FoldingRangeProvider:             nil,
@@ -101,7 +106,7 @@ func (h Handler) Initialize(ctx context.Context, params *protocol.InitializePara
 			// TextDocumentSync:                 nil,
 			// TypeDefinitionProvider:           nil,
 			// Workspace:                        &protocol.ServerCapabilitiesWorkspace{},
-			// WorkspaceSymbolProvider:          nil,
+			WorkspaceSymbolProvider: true,
 		},
 		ServerInfo: &protocol.ServerInfo{
 			Name:    "nostos",
@@ -165,16 +170,20 @@ func (h Handler) Definition(ctx context.Context, params *protocol.DefinitionPara
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
-		_ = h.state.symbolTable.Load()
-		return []protocol.Location{
-			{
-				URI: uri.File("foo.no"),
-				Range: protocol.Range{
-					Start: protocol.Position{Line: 0, Character: 0},
-					End:   protocol.Position{Line: 0, Character: 0},
-				},
-			},
-		}, nil
+		st := h.state.symbolTable.Load()
+		if st == nil {
+			return nil, nil
+		}
+		pos := lang.Position{LineNumber: uint(params.Position.Line), CharacterOffset: uint(params.Position.Character)}
+		entry, ok := st.LookupByPosition(pos)
+		if !ok {
+			return nil, nil
+		}
+		loc := protocol.Location{
+			URI:   protocol.DocumentURI(entry.DefinedIn),
+			Range: protocol.Range{Start: protocol.Position{Line: uint32(entry.Begin.LineNumber), Character: uint32(entry.Begin.CharacterOffset)}, End: protocol.Position{Line: uint32(entry.Begin.LineNumber), Character: uint32(entry.Begin.CharacterOffset)}},
+		}
+		return []protocol.Location{loc}, nil
 	}
 }
 
@@ -487,4 +496,66 @@ func getFields(td types.TypeDefinition, path []string) []types.FieldDefinition {
 		}
 	}
 	return fields
+}
+
+func (h Handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentSymbolParams) ([]interface{}, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	st := h.state.symbolTable.Load()
+	if st == nil {
+		return nil, nil
+	}
+
+	entries := st.SymbolsForDocument(uri.URI(params.TextDocument.URI))
+	symbols := make([]interface{}, 0, len(entries))
+	for _, e := range entries {
+		sym := protocol.DocumentSymbol{
+			Name: e.Symbol.Text,
+			Kind: protocol.SymbolKindVariable,
+			Range: protocol.Range{
+				Start: protocol.Position{Line: uint32(e.Begin.LineNumber), Character: uint32(e.Begin.CharacterOffset)},
+				End:   protocol.Position{Line: uint32(e.Begin.LineNumber), Character: uint32(e.Begin.CharacterOffset)},
+			},
+			SelectionRange: protocol.Range{
+				Start: protocol.Position{Line: uint32(e.Begin.LineNumber), Character: uint32(e.Begin.CharacterOffset)},
+				End:   protocol.Position{Line: uint32(e.Begin.LineNumber), Character: uint32(e.Begin.CharacterOffset)},
+			},
+		}
+		symbols = append(symbols, sym)
+	}
+	return symbols, nil
+}
+
+func (h Handler) Symbols(ctx context.Context, params *protocol.WorkspaceSymbolParams) ([]protocol.SymbolInformation, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	st := h.state.symbolTable.Load()
+	if st == nil {
+		return nil, nil
+	}
+	entries := st.AllEntries()
+	infos := make([]protocol.SymbolInformation, 0, len(entries))
+	for _, e := range entries {
+		info := protocol.SymbolInformation{
+			Name: e.Symbol.Text,
+			Kind: protocol.SymbolKindVariable,
+			Location: protocol.Location{
+				URI: protocol.DocumentURI(e.DefinedIn),
+				Range: protocol.Range{
+					Start: protocol.Position{Line: uint32(e.Begin.LineNumber), Character: uint32(e.Begin.CharacterOffset)},
+					End:   protocol.Position{Line: uint32(e.Begin.LineNumber), Character: uint32(e.Begin.CharacterOffset)},
+				},
+			},
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
 }

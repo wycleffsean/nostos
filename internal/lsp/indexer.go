@@ -2,6 +2,9 @@ package lsp
 
 import (
 	"context"
+	"io/fs"
+	"os"
+	"path/filepath"
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
@@ -24,6 +27,44 @@ func newIndexer(state *ServerState) *indexer {
 		didOpen:   make(chan protocol.DidOpenTextDocumentParams, 16),
 		didChange: make(chan protocol.DidChangeTextDocumentParams, 32),
 	}
+}
+
+// loadWorkspace scans the project root and workspace folders, reading all files
+// with extensions that the parser can understand and storing them in the
+// document map.
+func (a *indexer) loadWorkspace() {
+	a.state.mu.RLock()
+	root := a.state.projectRoot
+	a.state.mu.RUnlock()
+
+	if root == "" {
+		return
+	}
+
+	path := root.Filename()
+	fileExts := map[string]bool{".yaml": true, ".yml": true, ".no": true}
+
+	filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if !fileExts[filepath.Ext(path)] {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		u := uri.File(path)
+		a.state.mu.Lock()
+		a.state.documents[protocol.DocumentURI(u)] = string(data)
+		a.state.mu.Unlock()
+		return nil
+	})
+
+	a.reindex()
 }
 
 func (a *indexer) start(ctx context.Context) {

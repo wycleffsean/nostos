@@ -29,6 +29,10 @@ func runRegistryWorker(ctx context.Context, state *ServerState) {
 	state.registryReady <- registry
 	close(state.registryReady) // ✅ signal completion to listeners
 
+	if state.indexer != nil {
+		state.indexer.reindex()
+	}
+
 	if client != nil {
 		_ = client.LogMessage(ctx, &protocol.LogMessageParams{
 			Type:    protocol.MessageTypeInfo,

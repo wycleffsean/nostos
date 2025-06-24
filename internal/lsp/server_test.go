@@ -3,10 +3,13 @@ package lsp
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/wycleffsean/nostos/pkg/types"
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/jsonrpc2/fake"
 	"go.lsp.dev/protocol"
@@ -139,6 +142,11 @@ func TestDidChange(t *testing.T) {
 		t.Fatalf("Initialized failed: %v", err)
 	}
 
+	env.handler.state.mu.Lock()
+	env.handler.state.registry = types.DefaultRegistry()
+	env.handler.state.mu.Unlock()
+	env.handler.state.indexer.reindex()
+
 	docURI := protocol.DocumentURI("file:///foo.no")
 	openParams := &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
@@ -179,21 +187,35 @@ func TestDefinition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Initialize failed: %v", err)
 	}
+	if err := client.Initialized(ctx, &protocol.InitializedParams{}); err != nil {
+		t.Fatalf("Initialized failed: %v", err)
+	}
+
+	docURI := protocol.DocumentURI("file:///foo.no")
+	openParams := &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        docURI,
+			LanguageID: "nostos",
+			Version:    1,
+			Text:       "foo: \"1\"\n",
+		},
+	}
+	if err := client.DidOpen(ctx, openParams); err != nil {
+		t.Fatalf("DidOpen failed: %v", err)
+	}
+	env.handler.state.indexer.reindex()
+	waitForSymbol(t, env.handler, "foo")
 
 	locs, err := client.Definition(ctx, &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentURI("file:///foo.no")},
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
 			Position:     protocol.Position{Line: 0, Character: 0},
 		},
 	})
 	if err != nil {
 		t.Fatalf("Definition failed: %v", err)
 	}
-	want := []protocol.Location{{
-		URI:   uri.File("foo.no"),
-		Range: protocol.Range{Start: protocol.Position{Line: 0, Character: 0}, End: protocol.Position{Line: 0, Character: 0}},
-	}}
-	if len(locs) != 1 || locs[0] != want[0] {
+	if len(locs) != 1 || locs[0].URI != docURI {
 		t.Fatalf("unexpected definition result: %#v", locs)
 	}
 }
@@ -321,5 +343,96 @@ func TestNestedCodeAction(t *testing.T) {
 	edits := acts[0].Edit.Changes[docURI]
 	if len(edits) == 0 || !strings.Contains(edits[0].NewText, "type:") {
 		t.Fatalf("unexpected code action edits: %#v", edits)
+	}
+}
+
+func waitForSymbol(t *testing.T, h *Handler, name string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		st := h.state.symbolTable.Load()
+		if st != nil {
+			if _, ok := st.LookupByName(name); ok {
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("symbol %s not indexed", name)
+}
+
+func TestWorkspaceIndexingAndSymbols(t *testing.T) {
+	env := setup(t)
+	defer env.teardown()
+
+	dir := t.TempDir()
+	err := os.WriteFile(filepath.Join(dir, "a.yaml"), []byte("foo: \"1\"\n"), 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile(filepath.Join(dir, "b.yaml"), []byte("bar: \"2\"\n"), 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client := env.client
+	ctx := env.ctx
+
+	rootURI := protocol.DocumentURI(uri.File(filepath.ToSlash(dir)))
+	_, err = client.Initialize(ctx, &protocol.InitializeParams{RootURI: rootURI})
+	if err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+	if err := client.Initialized(ctx, &protocol.InitializedParams{}); err != nil {
+		t.Fatalf("Initialized failed: %v", err)
+	}
+
+	env.handler.state.mu.Lock()
+	env.handler.state.registry = types.DefaultRegistry()
+	env.handler.state.mu.Unlock()
+	env.handler.state.indexer.reindex()
+
+	waitForSymbol(t, env.handler, "foo")
+	waitForSymbol(t, env.handler, "bar")
+
+	docURI := protocol.DocumentURI(uri.File(filepath.Join(dir, "a.yaml")))
+	raw, err := client.DocumentSymbol(ctx, &protocol.DocumentSymbolParams{TextDocument: protocol.TextDocumentIdentifier{URI: docURI}})
+	if err != nil {
+		t.Fatalf("DocumentSymbol failed: %v", err)
+	}
+	if len(raw) != 1 {
+		t.Fatalf("unexpected document symbols: %#v", raw)
+	}
+	m, ok := raw[0].(map[string]interface{})
+	if !ok || m["name"] != "foo" {
+		t.Fatalf("unexpected document symbols: %#v", raw)
+	}
+
+	ws, err := client.Symbols(ctx, &protocol.WorkspaceSymbolParams{Query: ""})
+	if err != nil {
+		t.Fatalf("WorkspaceSymbol failed: %v", err)
+	}
+	if len(ws) < 2 {
+		t.Fatalf("expected workspace symbols, got %#v", ws)
+	}
+
+	// modify a file and ensure symbols update
+	change := &protocol.DidChangeTextDocumentParams{
+		TextDocument: protocol.VersionedTextDocumentIdentifier{
+			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: docURI},
+			Version:                2,
+		},
+		ContentChanges: []protocol.TextDocumentContentChangeEvent{{Text: "baz: \"3\"\n"}},
+	}
+	if err := client.DidChange(ctx, change); err != nil {
+		t.Fatalf("DidChange failed: %v", err)
+	}
+	waitForSymbol(t, env.handler, "baz")
+	st := env.handler.state.symbolTable.Load()
+	if st == nil {
+		t.Fatalf("symbol table nil")
+	}
+	if _, ok := st.LookupByName("foo"); ok {
+		t.Fatalf("old symbol should be removed")
 	}
 }

@@ -112,3 +112,24 @@ func (s *SymbolTable) ProcessAst(ast *Ast) {
 		s.AddSymbol(symbol, ast.Document)
 	}
 }
+
+// SymbolsForDocument returns all symbol entries belonging to a document.
+func (s *SymbolTable) SymbolsForDocument(doc uri.URI) []*SymbolEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	symbols := s.docIndex[doc]
+	res := make([]*SymbolEntry, len(symbols))
+	copy(res, symbols)
+	return res
+}
+
+// AllEntries returns every symbol entry in the table.
+func (s *SymbolTable) AllEntries() []*SymbolEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	entries := make([]*SymbolEntry, 0, len(s.byName))
+	for _, e := range s.byName {
+		entries = append(entries, e)
+	}
+	return entries
+}
