@@ -23,7 +23,7 @@ var applyCmd = &cobra.Command{
 	Use:   "apply",
 	Short: "Apply the computed changes to your cluster.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		clusterPlan, err := planner.BuildPlanFromCluster()
+		clusterPlan, err := planner.BuildPlanFromCluster(ignoreSystemNamespace)
 		if err != nil {
 			return err
 		}

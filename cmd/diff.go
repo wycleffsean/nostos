@@ -17,7 +17,7 @@ var diffCmd = &cobra.Command{
 	Use:   "diff",
 	Short: "Show differences between cluster and desired resources",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		clusterPlan, err := planner.BuildPlanFromCluster()
+		clusterPlan, err := planner.BuildPlanFromCluster(ignoreSystemNamespace)
 		if err != nil {
 			return err
 		}

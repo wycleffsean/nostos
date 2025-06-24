@@ -8,6 +8,8 @@ import (
 	"github.com/wycleffsean/nostos/pkg/kube"
 )
 
+const systemNamespace = "kube-system"
+
 // ResourceType represents an internal abstraction of a Kubernetes resource.
 type ResourceType struct {
 	APIVersion string
@@ -24,7 +26,7 @@ type Plan struct {
 }
 
 // BuildPlanFromCluster fetches all resources from the cluster and converts them into internal ResourceType representations.
-func BuildPlanFromCluster() (*Plan, error) {
+func BuildPlanFromCluster(ignoreSystemNamespace bool) (*Plan, error) {
 	clusterResources, err := kube.FetchAllResources()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cluster resources: %w", err)
@@ -41,11 +43,29 @@ func BuildPlanFromCluster() (*Plan, error) {
 				fmt.Printf("Warning: failed to convert resource: %v\n", err)
 				continue
 			}
+			if ignoreSystemNamespace {
+				if ns, _ := rt.Metadata["namespace"].(string); ns == systemNamespace {
+					continue
+				}
+			}
 			plan.Resources = append(plan.Resources, rt)
 		}
 	}
 
 	return &plan, nil
+}
+
+// FilterSystemNamespace removes resources that belong to the kube-system namespace.
+func FilterSystemNamespace(resources []ResourceType) []ResourceType {
+	var filtered []ResourceType
+	for _, r := range resources {
+		ns, _ := r.Metadata["namespace"].(string)
+		if ns == systemNamespace {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+	return filtered
 }
 
 // MergeUserDefinedResources takes a plan built from the cluster and merges it with resources defined in user code.

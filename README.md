@@ -40,3 +40,12 @@ nostos fetch --context=my-cluster
 # Fetch inside a Kubernetes pod (automatically uses in-cluster config)
 kubectl run nostos --image=nostos:latest -- fetch
 ```
+
+By default, Nostos ignores resources in the `kube-system` namespace when generating diffs or plans.
+If you need to include them, pass `--ignore-system-namespace=false`:
+
+```
+nostos diff --ignore-system-namespace=false
+nostos plan --ignore-system-namespace=false
+nostos apply --ignore-system-namespace=false
+```
