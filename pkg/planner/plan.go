@@ -79,3 +79,18 @@ func convertUnstructuredToResourceType(u *unstructured.Unstructured) (ResourceTy
 		Spec:       spec,
 	}, nil
 }
+
+// ConvertResourceType converts ResourceType to an unstructured.Unstructured object.
+func ConvertResourceType(r ResourceType) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": r.APIVersion,
+			"kind":       r.Kind,
+			"metadata":   r.Metadata,
+		},
+	}
+	if r.Spec != nil {
+		obj.Object["spec"] = r.Spec
+	}
+	return obj
+}
