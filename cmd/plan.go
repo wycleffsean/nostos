@@ -17,7 +17,7 @@ var planCmd = &cobra.Command{
 	Use:   "plan",
 	Short: "Generate an execution plan",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		clusterPlan, err := planner.BuildPlanFromCluster()
+		clusterPlan, err := planner.BuildPlanFromCluster(ignoreSystemNamespace)
 		if err != nil {
 			return err
 		}
