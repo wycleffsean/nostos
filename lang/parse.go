@@ -273,7 +273,7 @@ var tokenMap map[itemType]tokenMapping
 
 func init() {
 	tokenMap = make(map[itemType]tokenMapping)
-	tokenMap[itemError] = tokenMapping{precedenceCall, nullDenotationUnhandled, leftDenotationUnhandled}
+	tokenMap[itemError] = tokenMapping{precedenceCall, lexError, leftDenotationUnhandled}
 	tokenMap[itemColon] = tokenMapping{precedenceCall, nullDenotationUnhandled, _map}
 	tokenMap[itemArrow] = tokenMapping{precedenceCall, nullDenotationUnhandled, _function}
 	tokenMap[itemList] = tokenMapping{precedenceLowest, _list, leftDenotationUnhandled}
@@ -291,6 +291,10 @@ func nullDenotationUnhandled(p *parser) node {
 
 func leftDenotationUnhandled(p *parser, _ node) node {
 	return p._error(fmt.Sprintf("unhandled left denotation reached for '%v'", p.current.typ))
+}
+
+func lexError(p *parser) node {
+	return p._error(p.current.val)
 }
 
 func (p *parser) Parse() node {
@@ -338,7 +342,9 @@ func (p *parser) peek() *item {
 			p.peeked = &tok
 			return &tok
 		case <-time.After(2 * time.Second):
-			panic("parser peek timed out waiting for token")
+			err := &item{typ: itemError, val: "lexer timeout"}
+			p.peeked = err
+			return err
 		}
 	}
 }
