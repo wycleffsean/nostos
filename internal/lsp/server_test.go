@@ -323,3 +323,55 @@ func TestNestedCodeAction(t *testing.T) {
 		t.Fatalf("unexpected code action edits: %#v", edits)
 	}
 }
+
+func TestCodeActionInsertNewline(t *testing.T) {
+	env := setup(t)
+	defer env.teardown()
+
+	client := env.client
+	ctx := env.ctx
+
+	_, err := client.Initialize(ctx, &protocol.InitializeParams{RootURI: "file:///tmp"})
+	if err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+	if err := client.Initialized(ctx, &protocol.InitializedParams{}); err != nil {
+		t.Fatalf("Initialized failed: %v", err)
+	}
+
+	docURI := protocol.DocumentURI("file:///svc.yaml")
+	text := "apiVersion: v1\nkind: Service"
+	openParams := &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        docURI,
+			LanguageID: "nostos",
+			Version:    1,
+			Text:       text,
+		},
+	}
+	if err := client.DidOpen(ctx, openParams); err != nil {
+		t.Fatalf("DidOpen failed: %v", err)
+	}
+	waitForDocument(t, env.handler, docURI, text)
+
+	acts, err := client.CodeAction(ctx, &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: 0, Character: 0},
+			End:   protocol.Position{Line: 0, Character: 0},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CodeAction failed: %v", err)
+	}
+	if len(acts) == 0 {
+		t.Fatalf("expected code action")
+	}
+	edits := acts[0].Edit.Changes[docURI]
+	if len(edits) == 0 {
+		t.Fatalf("expected edits from code action")
+	}
+	if !strings.HasPrefix(edits[0].NewText, "\n") {
+		t.Fatalf("expected first edit to start with newline: %#v", edits)
+	}
+}
