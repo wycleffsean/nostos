@@ -46,9 +46,7 @@ func TestBuildPlanFromOdyssey(t *testing.T) {
 
 	odyssey := `
 test:
-  namespaces:
-    - foo
-  resources:
+  foo:
     - svc.yaml
 `
 	if err := os.WriteFile(filepath.Join(tmp, "odyssey.no"), []byte(odyssey), 0644); err != nil {
@@ -60,7 +58,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: cfg
-  namespace: foo
 `
 	if err := os.WriteFile(filepath.Join(tmp, "svc.yaml"), []byte(svc), 0644); err != nil {
 		t.Fatalf("write svc: %v", err)
