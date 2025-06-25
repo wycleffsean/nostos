@@ -21,7 +21,12 @@ var RootCmd = &cobra.Command{
 offering a plan/apply workflow similar to Terraform, as well as an integrated language server.`,
 	// Show help if no subcommand is provided
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		// Display help when the root command is executed without
+		// any subcommands. Check the returned error to satisfy
+		// linters and surface any unexpected issues to users.
+		if err := cmd.Help(); err != nil {
+			cobra.CheckErr(err)
+		}
 	},
 }
 
