@@ -6,9 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mitchellh/mapstructure"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
+	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/pkg/kube"
 	"github.com/wycleffsean/nostos/pkg/workspace"
 )
@@ -28,14 +30,14 @@ func BuildPlanFromOdyssey(ignoreSystemNamespace, ignoreClusterScoped bool) (*Pla
 	}
 
 	odysseyPath := filepath.Join(workspace.Dir(), "odyssey.no")
-	data, err := os.ReadFile(odysseyPath)
+	parsed, err := lang.ParseFile(odysseyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read odyssey file: %w", err)
+		return nil, fmt.Errorf("failed to parse odyssey file: %w", err)
 	}
 
 	entries := make(map[string]odysseyEntry)
-	if err := yaml.Unmarshal(data, &entries); err != nil {
-		return nil, fmt.Errorf("failed to parse odyssey file: %w", err)
+	if err := mapstructure.Decode(parsed, &entries); err != nil {
+		return nil, fmt.Errorf("failed to decode odyssey file: %w", err)
 	}
 
 	entry, ok := entries[ctx]

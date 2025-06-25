@@ -210,7 +210,7 @@ func isAlphaNumeric(r rune) bool {
 }
 
 func isValidKey(r rune) bool {
-	return isAlphaNumeric(r) || r == '/'
+	return isAlphaNumeric(r) || r == '/' || r == '.'
 }
 
 func isPathStart(l *lexer) bool {
