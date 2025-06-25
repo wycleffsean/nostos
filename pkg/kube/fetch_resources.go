@@ -13,6 +13,15 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
+// List of resources that are known to trigger deprecation warnings from the
+// Kubernetes API server. We simply skip them when fetching resources since they
+// are not typically useful in diffs and avoiding them keeps output clean.
+var deprecatedGVRs = []schema.GroupVersionResource{
+	{Group: "", Version: "v1", Resource: "componentstatuses"},
+	{Group: "", Version: "v1", Resource: "endpoints"},
+	{Group: "cilium.io", Version: "v2alpha1", Resource: "ciliumnodeconfigs"},
+}
+
 // FetchAllResources retrieves all resources available in the cluster.
 // It returns a map keyed by GroupVersionResource with a slice of unstructured objects.
 func FetchAllResources() (map[schema.GroupVersionResource][]*unstructured.Unstructured, error) {
@@ -64,6 +73,11 @@ func FetchAllResources() (map[schema.GroupVersionResource][]*unstructured.Unstru
 					Resource: r.Name,
 				}
 
+				// Skip deprecated resources to avoid API server warnings.
+				if isDeprecatedResource(gvr) {
+					continue
+				}
+
 				// List the resource.
 				list, err := dyn.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
@@ -96,6 +110,16 @@ func containsSubresource(name string) bool {
 func supportsListVerb(r metav1.APIResource) bool {
 	for _, v := range r.Verbs {
 		if strings.EqualFold(v, "list") {
+			return true
+		}
+	}
+	return false
+}
+
+// isDeprecatedResource returns true if the given GVR is in the deprecated list.
+func isDeprecatedResource(gvr schema.GroupVersionResource) bool {
+	for _, d := range deprecatedGVRs {
+		if gvr.Group == d.Group && gvr.Version == d.Version && gvr.Resource == d.Resource {
 			return true
 		}
 	}
