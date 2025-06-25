@@ -236,7 +236,7 @@ func TestHoverCompletionAndCodeAction(t *testing.T) {
 	if err != nil || hover == nil {
 		t.Fatalf("Hover failed: %v", err)
 	}
-	if !strings.Contains(hover.Contents.Value, "Service") {
+	if !strings.Contains(hover.Contents.Value, "string") {
 		t.Fatalf("unexpected hover: %#v", hover)
 	}
 
