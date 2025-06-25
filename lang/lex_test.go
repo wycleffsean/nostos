@@ -155,6 +155,17 @@ func TestLexIndent(t *testing.T) {
 	assertEOF(t, items)
 }
 
+func TestLexShovel(t *testing.T) {
+	_, items := NewStringLexer("a << b")
+	left := <-items
+	shovel := <-items
+	right := <-items
+	assertScalar(t, left, itemSymbol, "a", 0)
+	assertScalar(t, shovel, itemShovel, "<<", 0)
+	assertScalar(t, right, itemSymbol, "b", 0)
+	assertEOF(t, items)
+}
+
 func TestLexManifest(t *testing.T) {
 	manifest := `
 apiVersion: "apps/v1"
