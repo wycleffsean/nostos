@@ -18,10 +18,10 @@ func TestDiffResources(t *testing.T) {
 	if len(diff.ToCreate) != 1 || ResourceID(diff.ToCreate[0]) != "v1:C::c" {
 		t.Fatalf("expected create C got %+v", diff.ToCreate)
 	}
-	if len(diff.ToUpdate) != 1 || ResourceID(diff.ToUpdate[0]) != "v1:A::a" {
+	if len(diff.ToUpdate) != 1 || ResourceID(diff.ToUpdate[0].Desired) != "v1:A::a" {
 		t.Fatalf("expected update A got %+v", diff.ToUpdate)
 	}
-	if len(diff.ToDelete) != 1 || ResourceID(diff.ToDelete[0]) != "v1:B::b" {
-		t.Fatalf("expected delete B got %+v", diff.ToDelete)
+	if len(diff.Unmanaged) != 1 || ResourceID(diff.Unmanaged[0]) != "v1:B::b" {
+		t.Fatalf("expected unmanaged B got %+v", diff.Unmanaged)
 	}
 }

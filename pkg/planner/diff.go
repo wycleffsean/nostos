@@ -1,12 +1,22 @@
 package planner
 
-import "reflect"
+import (
+	"reflect"
+
+	"github.com/pmezard/go-difflib/difflib"
+	"sigs.k8s.io/yaml"
+)
 
 // DiffResult represents differences between desired resources and cluster state.
+type Update struct {
+	Current ResourceType
+	Desired ResourceType
+}
+
 type DiffResult struct {
-	ToCreate []ResourceType
-	ToUpdate []ResourceType
-	ToDelete []ResourceType
+	ToCreate  []ResourceType
+	ToUpdate  []Update
+	Unmanaged []ResourceType
 }
 
 // DiffResources computes the difference between cluster and desired resources.
@@ -29,13 +39,13 @@ func DiffResources(cluster, desired []ResourceType) DiffResult {
 			continue
 		}
 		if !reflect.DeepEqual(cr.Spec, dr.Spec) || cr.APIVersion != dr.APIVersion || cr.Kind != dr.Kind {
-			diff.ToUpdate = append(diff.ToUpdate, dr)
+			diff.ToUpdate = append(diff.ToUpdate, Update{Current: cr, Desired: dr})
 		}
 	}
 
 	for id, cr := range clusterMap {
 		if _, ok := desiredMap[id]; !ok {
-			diff.ToDelete = append(diff.ToDelete, cr)
+			diff.Unmanaged = append(diff.Unmanaged, cr)
 		}
 	}
 
@@ -46,6 +56,34 @@ func DiffResources(cluster, desired []ResourceType) DiffResult {
 // topologically based on their dependencies.
 func BuildPlanFromDiff(diff DiffResult) ([]ResourceType, error) {
 	toApply := append([]ResourceType{}, diff.ToCreate...)
-	toApply = append(toApply, diff.ToUpdate...)
+	for _, u := range diff.ToUpdate {
+		toApply = append(toApply, u.Desired)
+	}
 	return TopologicalSort(toApply)
+}
+
+// DiffString returns a unified diff of two resources focusing on their specs and metadata.
+func DiffString(current, desired ResourceType) string {
+	currYAML, _ := yaml.Marshal(map[string]interface{}{
+		"apiVersion": current.APIVersion,
+		"kind":       current.Kind,
+		"metadata":   current.Metadata,
+		"spec":       current.Spec,
+	})
+	desiredYAML, _ := yaml.Marshal(map[string]interface{}{
+		"apiVersion": desired.APIVersion,
+		"kind":       desired.Kind,
+		"metadata":   desired.Metadata,
+		"spec":       desired.Spec,
+	})
+
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(string(currYAML)),
+		B:        difflib.SplitLines(string(desiredYAML)),
+		FromFile: "cluster",
+		ToFile:   "desired",
+		Context:  3,
+	}
+	out, _ := difflib.GetUnifiedDiffString(diff)
+	return out
 }
