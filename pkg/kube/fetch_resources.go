@@ -48,6 +48,10 @@ func FetchAllResources() (map[schema.GroupVersionResource][]*unstructured.Unstru
 		groupName := groupResource.Group.Name // group name as string
 		for version, resourceList := range groupResource.VersionedResources {
 			for _, r := range resourceList {
+				// Skip resources that do not support the "list" verb
+				if !supportsListVerb(r) {
+					continue
+				}
 				// Skip subresources if the resource name contains a "/"
 				if containsSubresource(r.Name) {
 					continue
@@ -86,4 +90,14 @@ func FetchAllResources() (map[schema.GroupVersionResource][]*unstructured.Unstru
 func containsSubresource(name string) bool {
 	// A simple check: if the name contains a "/" it is likely a subresource.
 	return strings.Contains(name, "/")
+}
+
+// supportsListVerb checks whether the API resource supports the "list" verb.
+func supportsListVerb(r metav1.APIResource) bool {
+	for _, v := range r.Verbs {
+		if strings.EqualFold(v, "list") {
+			return true
+		}
+	}
+	return false
 }
