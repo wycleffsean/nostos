@@ -41,16 +41,18 @@ func printDiff(d planner.DiffResult, useColor bool) {
 		color.NoColor = true
 	}
 	green := color.New(color.FgGreen).SprintFunc()
-	red := color.New(color.FgRed).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
+	magenta := color.New(color.FgMagenta).SprintFunc()
 
 	for _, r := range d.ToCreate {
 		fmt.Printf("%s %s\n", green("+"), planner.ResourceID(r))
 	}
-	for _, r := range d.ToUpdate {
-		fmt.Printf("%s %s\n", yellow("~"), planner.ResourceID(r))
+	for _, u := range d.ToUpdate {
+		fmt.Printf("%s %s\n", yellow("~"), planner.ResourceID(u.Desired))
+		diffText := planner.DiffString(u.Current, u.Desired)
+		fmt.Print(diffText)
 	}
-	for _, r := range d.ToDelete {
-		fmt.Printf("%s %s\n", red("-"), planner.ResourceID(r))
+	for _, r := range d.Unmanaged {
+		fmt.Printf("%s %s\n", magenta("?"), planner.ResourceID(r))
 	}
 }
