@@ -44,3 +44,31 @@ func LoadKubeConfig() (*rest.Config, error) {
 
 	return config, nil
 }
+
+// CurrentContext returns the name of the currently selected Kubernetes context.
+func CurrentContext() (string, error) {
+	kubeconfigPath := viper.GetString("kubeconfig")
+	if kubeconfigPath == "" {
+		kubeconfigPath = os.Getenv("KUBECONFIG")
+	}
+
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	if kubeconfigPath != "" {
+		loadingRules.ExplicitPath = kubeconfigPath
+	}
+
+	overrides := &clientcmd.ConfigOverrides{}
+	if context := viper.GetString("context"); context != "" {
+		overrides.CurrentContext = context
+	}
+
+	rawConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides).RawConfig()
+	if err != nil {
+		return "", fmt.Errorf("could not load Kubernetes client config: %w", err)
+	}
+
+	if overrides.CurrentContext != "" {
+		return overrides.CurrentContext, nil
+	}
+	return rawConfig.CurrentContext, nil
+}

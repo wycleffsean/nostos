@@ -1,6 +1,14 @@
 package planner
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/spf13/viper"
+
+	"github.com/wycleffsean/nostos/pkg/workspace"
+)
 
 func TestFilterSystemNamespace(t *testing.T) {
 	resources := []ResourceType{
@@ -27,5 +35,74 @@ func TestFilterClusterScoped(t *testing.T) {
 	}
 	if ResourceID(filtered[0]) != "v1:ConfigMap:default:cfg" {
 		t.Fatalf("unexpected resource: %+v", filtered[0])
+	}
+}
+
+func TestBuildPlanFromOdyssey(t *testing.T) {
+	tmp := t.TempDir()
+
+	// workspace and odyssey file
+	workspace.Set(tmp)
+
+	odyssey := `
+test:
+  namespaces:
+    - foo
+  resources:
+    - svc.yaml
+`
+	if err := os.WriteFile(filepath.Join(tmp, "odyssey.no"), []byte(odyssey), 0644); err != nil {
+		t.Fatalf("write odyssey: %v", err)
+	}
+
+	svc := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cfg
+  namespace: foo
+`
+	if err := os.WriteFile(filepath.Join(tmp, "svc.yaml"), []byte(svc), 0644); err != nil {
+		t.Fatalf("write svc: %v", err)
+	}
+
+	kubeconfig := `
+apiVersion: v1
+kind: Config
+current-context: test
+contexts:
+- name: test
+  context:
+    cluster: test
+    user: test
+clusters:
+- name: test
+  cluster:
+    server: https://example.com
+users:
+- name: test
+  user: {}
+`
+	kc := filepath.Join(tmp, "kubeconfig")
+	if err := os.WriteFile(kc, []byte(kubeconfig), 0644); err != nil {
+		t.Fatalf("write kubeconfig: %v", err)
+	}
+
+	viper.Set("kubeconfig", kc)
+	viper.Set("context", "")
+
+	plan, err := BuildPlanFromOdyssey(false, false)
+	if err != nil {
+		t.Fatalf("plan error: %v", err)
+	}
+
+	if len(plan.Resources) != 2 {
+		t.Fatalf("expected 2 resources got %d", len(plan.Resources))
+	}
+	if id := ResourceID(plan.Resources[0]); id != "v1:Namespace::foo" {
+		t.Fatalf("unexpected namespace resource %s", id)
+	}
+	if id := ResourceID(plan.Resources[1]); id != "v1:ConfigMap:foo:cfg" {
+		t.Fatalf("unexpected resource %s", id)
 	}
 }
