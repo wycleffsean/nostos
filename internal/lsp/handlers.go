@@ -441,7 +441,8 @@ func findPathAndNode(root *yaml.Node, line int) ([]string, *yaml.Node) {
 		if found {
 			return
 		}
-		if n.Kind == yaml.MappingNode {
+		switch n.Kind {
+		case yaml.MappingNode:
 			for i := 0; i < len(n.Content); i += 2 {
 				k := n.Content[i]
 				v := n.Content[i+1]
@@ -459,7 +460,7 @@ func findPathAndNode(root *yaml.Node, line int) ([]string, *yaml.Node) {
 					}
 				}
 			}
-		} else if n.Kind == yaml.SequenceNode {
+		case yaml.SequenceNode:
 			for i, c := range n.Content {
 				s, e := nodeRange(c)
 				if line >= s && line <= e {

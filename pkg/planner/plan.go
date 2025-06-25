@@ -8,8 +8,6 @@ import (
 	"github.com/wycleffsean/nostos/pkg/kube"
 )
 
-const systemNamespace = "kube-system"
-
 // systemNamespaces lists namespaces considered internal to the cluster.
 var systemNamespaces = map[string]struct{}{
 	"kube-system":     {},
