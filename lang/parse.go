@@ -285,6 +285,7 @@ func init() {
 	tokenMap[itemError] = tokenMapping{precedenceCall, lexError, leftDenotationUnhandled}
 	tokenMap[itemColon] = tokenMapping{precedenceCall, nullDenotationUnhandled, _map}
 	tokenMap[itemArrow] = tokenMapping{precedenceCall, nullDenotationUnhandled, _function}
+	tokenMap[itemShovel] = tokenMapping{precedenceCall, nullDenotationUnhandled, _shovel}
 	tokenMap[itemList] = tokenMapping{precedenceLowest, _list, leftDenotationUnhandled}
 	tokenMap[itemString] = tokenMapping{precedenceLowest, _string, leftDenotationUnhandled}
 	tokenMap[itemPath] = tokenMapping{precedenceLowest, _path, leftDenotationUnhandled}
@@ -477,4 +478,12 @@ func _function(p *parser, param node) node {
 
 	f := &Function{Param: sym, Body: body}
 	return f
+}
+
+func _shovel(p *parser, left node) node {
+	right := p.parseExpression(precedenceEquality)
+	if err, ok := right.(errorNode); ok {
+		return err
+	}
+	return &Shovel{Left: left, Right: right}
 }

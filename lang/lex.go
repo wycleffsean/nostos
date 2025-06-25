@@ -22,6 +22,7 @@ const (
 	itemList
 	itemColon
 	itemArrow      // =>
+	itemShovel     // <<
 	itemLeftParen  // (
 	itemRightParen // )
 	// itemElse
@@ -275,6 +276,13 @@ func lexInDocument(l *lexer) stateFn {
 			return lexInDocument
 		}
 		return l.errorf("unexpected '='")
+	case '<':
+		l.next()
+		if l.next() == '<' {
+			l.emit(itemShovel)
+			return lexInDocument
+		}
+		return l.errorf("unexpected '<'")
 	case ':':
 		l.next()
 		l.emit(itemColon)

@@ -185,6 +185,14 @@ func TestParseFunction(t *testing.T) {
 	}
 }
 
+func TestParseShovel(t *testing.T) {
+	got := parseString("a << b")
+	wanted := &Shovel{Left: &Symbol{Position{}, "a"}, Right: &Symbol{Position{}, "b"}}
+	if !reflect.DeepEqual(got, wanted) {
+		t.Errorf("shovel parse mismatch - expected: %#v got: %#v", wanted, got)
+	}
+}
+
 func TestParseHandlesLexerErrors(t *testing.T) {
 	// Input with an unterminated string should not cause panics
 	got := parseString("apiVersion: \"v1\"\nkind: \"Service")
