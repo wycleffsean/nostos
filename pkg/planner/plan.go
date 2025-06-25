@@ -8,7 +8,12 @@ import (
 	"github.com/wycleffsean/nostos/pkg/kube"
 )
 
-const systemNamespace = "kube-system"
+// systemNamespaces lists namespaces considered internal to the cluster.
+var systemNamespaces = map[string]struct{}{
+	"kube-system":     {},
+	"kube-public":     {},
+	"kube-node-lease": {},
+}
 
 // ResourceType represents an internal abstraction of a Kubernetes resource.
 type ResourceType struct {
@@ -26,7 +31,7 @@ type Plan struct {
 }
 
 // BuildPlanFromCluster fetches all resources from the cluster and converts them into internal ResourceType representations.
-func BuildPlanFromCluster(ignoreSystemNamespace bool) (*Plan, error) {
+func BuildPlanFromCluster(ignoreSystemNamespace, ignoreClusterScoped bool) (*Plan, error) {
 	clusterResources, err := kube.FetchAllResources()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cluster resources: %w", err)
@@ -44,7 +49,14 @@ func BuildPlanFromCluster(ignoreSystemNamespace bool) (*Plan, error) {
 				continue
 			}
 			if ignoreSystemNamespace {
-				if ns, _ := rt.Metadata["namespace"].(string); ns == systemNamespace {
+				if ns, _ := rt.Metadata["namespace"].(string); ns != "" {
+					if _, ok := systemNamespaces[ns]; ok {
+						continue
+					}
+				}
+			}
+			if ignoreClusterScoped {
+				if _, ok := rt.Metadata["namespace"]; !ok {
 					continue
 				}
 			}
@@ -60,7 +72,19 @@ func FilterSystemNamespace(resources []ResourceType) []ResourceType {
 	var filtered []ResourceType
 	for _, r := range resources {
 		ns, _ := r.Metadata["namespace"].(string)
-		if ns == systemNamespace {
+		if _, ok := systemNamespaces[ns]; ok {
+			continue
+		}
+		filtered = append(filtered, r)
+	}
+	return filtered
+}
+
+// FilterClusterScoped removes resources that are not associated with a namespace.
+func FilterClusterScoped(resources []ResourceType) []ResourceType {
+	var filtered []ResourceType
+	for _, r := range resources {
+		if _, ok := r.Metadata["namespace"]; !ok {
 			continue
 		}
 		filtered = append(filtered, r)
