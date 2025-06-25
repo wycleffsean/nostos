@@ -1,7 +1,7 @@
 package lang
 
 import (
-	"fmt"
+	"errors"
 	"os"
 
 	"github.com/mitchellh/mapstructure"
@@ -13,7 +13,7 @@ func ParseString(input string) (interface{}, error) {
 	parser := NewParser(items)
 	n := parser.Parse()
 	if err, ok := n.(errorNode); ok {
-		return nil, fmt.Errorf(err.Error())
+		return nil, errors.New(err.Error())
 	}
 	return nodeToInterface(n), nil
 }
