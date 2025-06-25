@@ -7,6 +7,7 @@ import (
 	// "path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/wycleffsean/nostos/pkg/workspace"
@@ -18,8 +19,14 @@ var RootCmd = &cobra.Command{
 	Short: "Nostos is a Helm replacement for Kubernetes with its own DSL.",
 	Long: `Nostos is a programming language designed for Kubernetes configuration,
 offering a plan/apply workflow similar to Terraform, as well as an integrated language server.`,
+	// Show help if no subcommand is provided
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Nostos CLI. Use --help for more information.")
+		// Display help when the root command is executed without
+		// any subcommands. Check the returned error to satisfy
+		// linters and surface any unexpected issues to users.
+		if err := cmd.Help(); err != nil {
+			cobra.CheckErr(err)
+		}
 	},
 }
 
@@ -40,9 +47,10 @@ func Execute() {
 }
 
 func init() {
-	// TODO: is this needed?
-	// parse standard flags (required for klog/client-go logging adjustments).
-	flag.Parse()
+	// Make standard library flags available to Cobra commands.
+	// This allows packages like klog to register flags without
+	// overriding Cobra's flag parsing or help output.
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
 	// Global flags available for all commands
 	RootCmd.PersistentFlags().String("kubeconfig", "", "Path to kubeconfig file")
