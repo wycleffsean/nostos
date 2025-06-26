@@ -437,42 +437,56 @@ func symbol(p *parser) node {
 }
 
 func _map(p *parser, key node) node {
-	var m Map
+	var m *Map
 
-	priorMap, last_node_was_map := p.priorNode.(*Map)
-
-	// fmt.Printf("current_indent: %d, priorIndent: %d, last_node_was_map: %t\n", p.currentIndent, p.priorIndent, last_node_was_map)
-	if p.currentIndent == p.priorIndent && last_node_was_map {
-		// continue building existing map
-		m = *priorMap
+	if prior, ok := p.priorNode.(*Map); ok && p.currentIndent == p.priorIndent {
+		m = prior
 	} else {
-		m = make(map[Symbol]node)
+		tmp := make(Map)
+		m = &tmp
 	}
 
 	value := p.parseExpression(precedenceEquality)
 	if err, ok := value.(errorNode); ok {
 		return err
 	}
-	m[*key.(*Symbol)] = value
+	(*m)[*key.(*Symbol)] = value
+	// Update parser state so subsequent key-value pairs at the same indent
+	// are added to this map
+	p.priorNode = m
+	p.priorIndent = p.currentIndent
 
-	return &m
+	return m
 }
 
 func _list(p *parser) node {
-	var l List
+	var l *List
 	if prior, ok := p.priorNode.(*List); ok && p.currentIndent == p.priorIndent {
-		l = *prior
+		l = prior
 	} else {
-		l = make([]node, 0)
+		l = new(List)
 	}
 
-	value := p.parseExpression(precedenceEquality)
-	if err, ok := value.(errorNode); ok {
-		return err
+	for {
+		value := p.parseExpression(precedenceEquality)
+		if err, ok := value.(errorNode); ok {
+			return err
+		}
+		*l = append(*l, value)
+
+		// Peek ahead to see if the next token is another list item at
+		// the same indentation level
+		next := p.peek()
+		if next.typ != itemList || next.indent != p.currentIndent {
+			break
+		}
+		// consume the '-' token and continue parsing the next item
+		p.accept()
 	}
 
-	l = append(l, value)
-	return &l
+	p.priorNode = l
+	p.priorIndent = p.currentIndent
+	return l
 }
 
 func _function(p *parser, param node) node {
