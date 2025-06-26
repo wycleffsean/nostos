@@ -13,6 +13,7 @@ import (
 	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/pkg/kube"
 	"github.com/wycleffsean/nostos/pkg/workspace"
+	"github.com/wycleffsean/nostos/vm"
 )
 
 // odysseyEntry represents a single cluster entry in odyssey.no. Each key in the
@@ -30,13 +31,20 @@ func BuildPlanFromOdyssey(ignoreSystemNamespace, ignoreClusterScoped bool) (*Pla
 	}
 
 	odysseyPath := filepath.Join(workspace.Dir(), "odyssey.no")
-	parsed, err := lang.ParseFile(odysseyPath)
+	data, err := os.ReadFile(odysseyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse odyssey file: %w", err)
+		return nil, fmt.Errorf("failed to read odyssey file: %w", err)
+	}
+	_, items := lang.NewStringLexer(string(data))
+	p := lang.NewParser(items)
+	ast := p.Parse()
+	val, err := vm.Eval(ast)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate odyssey file: %w", err)
 	}
 
 	entries := make(map[string]odysseyEntry)
-	if err := mapstructure.Decode(parsed, &entries); err != nil {
+	if err := mapstructure.Decode(val, &entries); err != nil {
 		return nil, fmt.Errorf("failed to decode odyssey file: %w", err)
 	}
 

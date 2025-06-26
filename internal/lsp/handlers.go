@@ -30,6 +30,8 @@ type ServerState struct {
 	documents   map[protocol.DocumentURI]string
 	symbolTable atomic.Pointer[lang.SymbolTable]
 
+	odyssey interface{}
+
 	indexer *indexer
 }
 
