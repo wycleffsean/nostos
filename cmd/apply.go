@@ -27,7 +27,11 @@ var applyCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		var desired []planner.ResourceType
+		odysseyPlan, err := planner.BuildPlanFromOdyssey(ignoreSystemNamespace, ignoreClusterScoped)
+		if err != nil {
+			return err
+		}
+		desired := odysseyPlan.Resources
 		diff := planner.DiffResources(clusterPlan.Resources, desired)
 		plan, err := planner.BuildPlanFromDiff(diff)
 		if err != nil {
