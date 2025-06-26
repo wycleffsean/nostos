@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/wycleffsean/nostos/lang"
@@ -87,7 +88,7 @@ func (v *VM) evalNode(n interface{}) error {
 	case *lang.Shovel:
 		return fmt.Errorf("shovel operator not supported in evaluation")
 	case *lang.ParseError:
-		return fmt.Errorf(node.Error())
+		return errors.New(node.Error())
 	default:
 		return fmt.Errorf("unknown node type %T", node)
 	}
