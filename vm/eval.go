@@ -8,10 +8,13 @@ import (
 )
 
 type VM struct {
-	stack []interface{}
+	stack   []interface{}
+	baseDir string
 }
 
-func New() *VM { return &VM{stack: make([]interface{}, 0)} }
+func newVM(dir string) *VM { return &VM{stack: make([]interface{}, 0), baseDir: dir} }
+
+func New() *VM { return newVM(".") }
 
 func (v *VM) push(x interface{}) { v.stack = append(v.stack, x) }
 
@@ -49,7 +52,11 @@ func (v *VM) appendItem() {
 }
 
 func Eval(n interface{}) (interface{}, error) {
-	vm := New()
+	return EvalWithDir(n, ".")
+}
+
+func EvalWithDir(n interface{}, dir string) (interface{}, error) {
+	vm := newVM(dir)
 	if err := vm.evalNode(n); err != nil {
 		return nil, err
 	}

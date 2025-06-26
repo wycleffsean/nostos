@@ -18,7 +18,7 @@ func TestBuiltinImport(t *testing.T) {
 
 	expr := fmt.Sprintf("foo: import(%s)", file)
 	ast := parse(expr)
-	result, err := Eval(ast)
+	result, err := EvalWithDir(ast, ".")
 	if err != nil {
 		t.Fatalf("eval error: %v", err)
 	}

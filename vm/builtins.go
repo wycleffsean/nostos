@@ -3,6 +3,7 @@ package vm
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/wycleffsean/nostos/lang"
 )
@@ -25,6 +26,9 @@ func builtinImport(v *VM, args ...interface{}) error {
 	if !ok {
 		return fmt.Errorf("import expects a path argument")
 	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(v.baseDir, path)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -32,7 +36,7 @@ func builtinImport(v *VM, args ...interface{}) error {
 	_, items := lang.NewStringLexer(string(data))
 	p := lang.NewParser(items)
 	ast := p.Parse()
-	res, err := Eval(ast)
+	res, err := EvalWithDir(ast, filepath.Dir(path))
 	if err != nil {
 		return err
 	}
