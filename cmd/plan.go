@@ -21,8 +21,11 @@ var planCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		// TODO: load desired resources from user files once parser is implemented
-		var desired []planner.ResourceType
+		odysseyPlan, err := planner.BuildPlanFromOdyssey(ignoreSystemNamespace, ignoreClusterScoped)
+		if err != nil {
+			return err
+		}
+		desired := odysseyPlan.Resources
 
 		diff := planner.DiffResources(clusterPlan.Resources, desired)
 		plan, err := planner.BuildPlanFromDiff(diff)
