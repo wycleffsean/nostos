@@ -85,6 +85,24 @@ func (v *VM) evalNode(n interface{}) error {
 		}
 	case *lang.Function:
 		return fmt.Errorf("functions not supported in evaluation")
+	case *lang.Call:
+		if err := v.evalNode(node.Func); err != nil {
+			return err
+		}
+		fn := v.pop()
+		if err := v.evalNode(node.Arg); err != nil {
+			return err
+		}
+		arg := v.pop()
+		name, ok := fn.(string)
+		if !ok {
+			return fmt.Errorf("function name must be a symbol")
+		}
+		builtin, ok := builtins[name]
+		if !ok {
+			return fmt.Errorf("unknown builtin %s", name)
+		}
+		return builtin(v, arg)
 	case *lang.Shovel:
 		return fmt.Errorf("shovel operator not supported in evaluation")
 	case *lang.ParseError:

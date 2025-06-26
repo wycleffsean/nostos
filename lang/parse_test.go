@@ -193,6 +193,14 @@ func TestParseShovel(t *testing.T) {
 	}
 }
 
+func TestParseCall(t *testing.T) {
+	got := parseString("foo(bar)")
+	wanted := &Call{Func: &Symbol{Position{}, "foo"}, Arg: &Symbol{Position{}, "bar"}}
+	if !reflect.DeepEqual(got, wanted) {
+		t.Errorf("call parse mismatch - expected: %#v got: %#v", wanted, got)
+	}
+}
+
 func TestParseHandlesLexerErrors(t *testing.T) {
 	// Input with an unterminated string should not cause panics
 	got := parseString("apiVersion: \"v1\"\nkind: \"Service")
