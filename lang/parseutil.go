@@ -42,6 +42,8 @@ func nodeToInterface(n node) interface{} {
 		return v.Text
 	case *Path:
 		return v.Text
+	case *Number:
+		return v.Value
 	case *Symbol:
 		return v.Text
 	case *List:

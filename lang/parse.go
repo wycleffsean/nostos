@@ -31,6 +31,7 @@ package lang
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -287,6 +288,7 @@ func init() {
 	tokenMap[itemArrow] = tokenMapping{precedenceCall, nullDenotationUnhandled, _function}
 	tokenMap[itemShovel] = tokenMapping{precedenceCall, nullDenotationUnhandled, _shovel}
 	tokenMap[itemList] = tokenMapping{precedenceLowest, _list, leftDenotationUnhandled}
+	tokenMap[itemNumber] = tokenMapping{precedenceLowest, _number, leftDenotationUnhandled}
 	tokenMap[itemString] = tokenMapping{precedenceLowest, _string, leftDenotationUnhandled}
 	tokenMap[itemPath] = tokenMapping{precedenceLowest, _path, leftDenotationUnhandled}
 	tokenMap[itemSymbol] = tokenMapping{precedenceLowest, symbol, leftDenotationUnhandled}
@@ -420,6 +422,14 @@ func _string(p *parser) node {
 
 func _path(p *parser) node {
 	return &Path{Position{}, p.current.val}
+}
+
+func _number(p *parser) node {
+	v, err := strconv.ParseFloat(p.current.val, 64)
+	if err != nil {
+		return p._error(err.Error())
+	}
+	return &Number{Position{}, v}
 }
 
 func symbol(p *parser) node {
