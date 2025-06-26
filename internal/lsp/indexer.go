@@ -9,7 +9,6 @@ import (
 
 	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/pkg/types"
-	"github.com/wycleffsean/nostos/vm"
 )
 
 // indexer processes document events in the background and keeps the symbol
@@ -111,15 +110,29 @@ func (a *indexer) reindex() {
 			st.ProcessAst(&ast)
 		}
 
-		if filepath.Base(u.Filename()) == "odyssey.no" {
-			val, err := vm.EvalWithDir(ast.RootNode, filepath.Dir(u.Filename()))
-			if err == nil {
-				a.state.mu.Lock()
-				a.state.odyssey = val
-				a.state.mu.Unlock()
-			} else {
-				log.Sugar().Warnf("failed to eval odyssey: %v", err)
-			}
+		diags := []protocol.Diagnostic{}
+		collectDiagnostics(ast.RootNode, &diags)
+
+		evalDiags, val := evalForDiagnostics(ast.RootNode, filepath.Dir(u.Filename()))
+		if len(evalDiags) > 0 {
+			diags = append(diags, evalDiags...)
+		}
+
+		if filepath.Base(u.Filename()) == "odyssey.no" && len(evalDiags) == 0 {
+			a.state.mu.Lock()
+			a.state.odyssey = val
+			a.state.mu.Unlock()
+		}
+
+		a.state.mu.Lock()
+		a.state.diagnostics[protocol.DocumentURI(u)] = diags
+		a.state.mu.Unlock()
+
+		if a.state.client != nil {
+			_ = a.state.client.PublishDiagnostics(context.Background(), &protocol.PublishDiagnosticsParams{
+				URI:         protocol.DocumentURI(u),
+				Diagnostics: diags,
+			})
 		}
 	}
 	if st != nil {
