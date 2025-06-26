@@ -2,12 +2,14 @@ package lsp
 
 import (
 	"context"
+	"path/filepath"
 
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 
 	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/pkg/types"
+	"github.com/wycleffsean/nostos/vm"
 )
 
 // indexer processes document events in the background and keeps the symbol
@@ -90,9 +92,6 @@ func (a *indexer) ensureRegistry() *types.Registry {
 
 func (a *indexer) reindex() {
 	reg := a.ensureRegistry()
-	if reg == nil {
-		return
-	}
 
 	a.state.mu.RLock()
 	docs := make(map[uri.URI]string, len(a.state.documents))
@@ -101,10 +100,29 @@ func (a *indexer) reindex() {
 	}
 	a.state.mu.RUnlock()
 
-	st := lang.NewSymbolTable(reg)
+	var st *lang.SymbolTable
+	if reg != nil {
+		st = lang.NewSymbolTable(reg)
+	}
+
 	for u, text := range docs {
 		ast := lang.NewAst(text, u)
-		st.ProcessAst(&ast)
+		if st != nil {
+			st.ProcessAst(&ast)
+		}
+
+		if filepath.Base(u.Filename()) == "odyssey.no" {
+			val, err := vm.Eval(ast.RootNode)
+			if err == nil {
+				a.state.mu.Lock()
+				a.state.odyssey = val
+				a.state.mu.Unlock()
+			} else {
+				log.Sugar().Warnf("failed to eval odyssey: %v", err)
+			}
+		}
 	}
-	a.state.symbolTable.Store(st)
+	if st != nil {
+		a.state.symbolTable.Store(st)
+	}
 }

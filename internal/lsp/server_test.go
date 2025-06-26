@@ -168,6 +168,51 @@ func TestDidChange(t *testing.T) {
 	waitForDocument(t, env.handler, docURI, "a: \"2\"\n")
 }
 
+func TestOdysseyEvaluation(t *testing.T) {
+	env := setup(t)
+	defer env.teardown()
+
+	client := env.client
+	ctx := env.ctx
+
+	_, err := client.Initialize(ctx, &protocol.InitializeParams{RootURI: "file:///tmp"})
+	if err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+	if err := client.Initialized(ctx, &protocol.InitializedParams{}); err != nil {
+		t.Fatalf("Initialized failed: %v", err)
+	}
+
+	docURI := protocol.DocumentURI("file:///odyssey.no")
+	text := "cluster:\n  default:\n    - svc.yaml\n"
+	openParams := &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        docURI,
+			LanguageID: "nostos",
+			Version:    1,
+			Text:       text,
+		},
+	}
+	if err := client.DidOpen(ctx, openParams); err != nil {
+		t.Fatalf("DidOpen failed: %v", err)
+	}
+	waitForDocument(t, env.handler, docURI, text)
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		env.handler.state.mu.RLock()
+		val := env.handler.state.odyssey
+		env.handler.state.mu.RUnlock()
+		if m, ok := val.(map[string]interface{}); ok {
+			if _, ok := m["cluster"]; ok {
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("odyssey value not evaluated")
+}
+
 func TestDefinition(t *testing.T) {
 	env := setup(t)
 	defer env.teardown()
