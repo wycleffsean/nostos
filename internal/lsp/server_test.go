@@ -98,6 +98,25 @@ func waitForDocument(t *testing.T, h *Handler, uri protocol.DocumentURI, expect 
 	t.Fatalf("document %s did not reach expected text", uri)
 }
 
+// waitForDiagnostic polls the handler's diagnostics store until a diagnostic for uri
+// contains the expected substring or the timeout expires.
+func waitForDiagnostic(t *testing.T, h *Handler, uri protocol.DocumentURI, expect string) {
+	t.Helper()
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		h.state.mu.RLock()
+		diags := h.state.diagnostics[uri]
+		h.state.mu.RUnlock()
+		for _, d := range diags {
+			if strings.Contains(d.Message, expect) {
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("diagnostic for %s did not contain %q", uri, expect)
+}
+
 func TestInitializeAndInitialized(t *testing.T) {
 	env := setup(t)
 	defer env.teardown()
@@ -419,4 +438,36 @@ func TestCodeActionInsertNewline(t *testing.T) {
 	if !strings.HasPrefix(edits[0].NewText, "\n") {
 		t.Fatalf("expected first edit to start with newline: %#v", edits)
 	}
+}
+
+func TestPublishDiagnostics(t *testing.T) {
+	env := setup(t)
+	defer env.teardown()
+
+	client := env.client
+	ctx := env.ctx
+
+	_, err := client.Initialize(ctx, &protocol.InitializeParams{RootURI: "file:///tmp"})
+	if err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+	if err := client.Initialized(ctx, &protocol.InitializedParams{}); err != nil {
+		t.Fatalf("Initialized failed: %v", err)
+	}
+
+	docURI := protocol.DocumentURI("file:///bad.no")
+	openParams := &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        docURI,
+			LanguageID: "nostos",
+			Version:    1,
+			Text:       "foo:",
+		},
+	}
+	if err := client.DidOpen(ctx, openParams); err != nil {
+		t.Fatalf("DidOpen failed: %v", err)
+	}
+
+	waitForDocument(t, env.handler, docURI, "foo:")
+	waitForDiagnostic(t, env.handler, docURI, "ParseError")
 }

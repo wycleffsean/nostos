@@ -28,6 +28,7 @@ type ServerState struct {
 
 	registry    *types.Registry
 	documents   map[protocol.DocumentURI]string
+	diagnostics map[protocol.DocumentURI][]protocol.Diagnostic
 	symbolTable atomic.Pointer[lang.SymbolTable]
 
 	odyssey interface{}
@@ -54,6 +55,7 @@ func NewHandler(ctx context.Context, server protocol.Server, logger *zap.Logger)
 	state := &ServerState{
 		mu:            sync.RWMutex{},
 		documents:     make(map[protocol.DocumentURI]string),
+		diagnostics:   make(map[protocol.DocumentURI][]protocol.Diagnostic),
 		registryReady: make(chan *types.Registry),
 	}
 	state.indexer = newIndexer(state)
