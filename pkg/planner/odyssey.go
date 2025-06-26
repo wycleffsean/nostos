@@ -38,7 +38,7 @@ func BuildPlanFromOdyssey(ignoreSystemNamespace, ignoreClusterScoped bool) (*Pla
 	_, items := lang.NewStringLexer(string(data))
 	p := lang.NewParser(items)
 	ast := p.Parse()
-	val, err := vm.Eval(ast)
+	val, err := vm.EvalWithDir(ast, filepath.Dir(odysseyPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate odyssey file: %w", err)
 	}

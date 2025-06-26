@@ -17,7 +17,7 @@ func parse(input string) interface{} {
 
 func TestEvalSimpleMap(t *testing.T) {
 	ast := parse("foo: 1\nbar: \"example\"")
-	result, err := Eval(ast)
+	result, err := EvalWithDir(ast, ".")
 	if err != nil {
 		t.Fatalf("eval error: %v", err)
 	}
@@ -28,7 +28,8 @@ func TestEvalSimpleMap(t *testing.T) {
 }
 
 func TestEvalOdysseyExample(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("..", "examples", "odyssey.no"))
+	path := filepath.Join("..", "examples", "odyssey.no")
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read example: %v", err)
 	}
@@ -37,14 +38,20 @@ func TestEvalOdysseyExample(t *testing.T) {
 	p := lang.NewParser(items)
 	ast := p.Parse()
 
-	got, err := Eval(ast)
+	got, err := EvalWithDir(ast, filepath.Dir(path))
 	if err != nil {
 		t.Fatalf("eval error: %v", err)
 	}
 
 	want := map[string]interface{}{
 		"do-nyc1-k8s-1-33-1-do-0-nyc1-1750371119772": map[string]interface{}{
-			"default": []interface{}{"./redis-service.no", "./redis-deployment.no"},
+			"default": []interface{}{
+				map[string]interface{}{"targetPort": float64(6379)},
+				map[string]interface{}{
+					"image": map[string]interface{}{"redis": "alpine"},
+					"ports": []interface{}{map[string]interface{}{"containerPort": float64(6379)}},
+				},
+			},
 		},
 	}
 

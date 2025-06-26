@@ -8,10 +8,13 @@ import (
 )
 
 type VM struct {
-	stack []interface{}
+	stack   []interface{}
+	baseDir string
 }
 
-func New() *VM { return &VM{stack: make([]interface{}, 0)} }
+func newVM(dir string) *VM { return &VM{stack: make([]interface{}, 0), baseDir: dir} }
+
+func New() *VM { return newVM(".") }
 
 func (v *VM) push(x interface{}) { v.stack = append(v.stack, x) }
 
@@ -49,7 +52,11 @@ func (v *VM) appendItem() {
 }
 
 func Eval(n interface{}) (interface{}, error) {
-	vm := New()
+	return EvalWithDir(n, ".")
+}
+
+func EvalWithDir(n interface{}, dir string) (interface{}, error) {
+	vm := newVM(dir)
 	if err := vm.evalNode(n); err != nil {
 		return nil, err
 	}
@@ -85,6 +92,24 @@ func (v *VM) evalNode(n interface{}) error {
 		}
 	case *lang.Function:
 		return fmt.Errorf("functions not supported in evaluation")
+	case *lang.Call:
+		if err := v.evalNode(node.Func); err != nil {
+			return err
+		}
+		fn := v.pop()
+		if err := v.evalNode(node.Arg); err != nil {
+			return err
+		}
+		arg := v.pop()
+		name, ok := fn.(string)
+		if !ok {
+			return fmt.Errorf("function name must be a symbol")
+		}
+		builtin, ok := builtins[name]
+		if !ok {
+			return fmt.Errorf("unknown builtin %s", name)
+		}
+		return builtin(v, arg)
 	case *lang.Shovel:
 		return fmt.Errorf("shovel operator not supported in evaluation")
 	case *lang.ParseError:

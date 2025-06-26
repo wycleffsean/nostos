@@ -112,7 +112,7 @@ func (a *indexer) reindex() {
 		}
 
 		if filepath.Base(u.Filename()) == "odyssey.no" {
-			val, err := vm.Eval(ast.RootNode)
+			val, err := vm.EvalWithDir(ast.RootNode, filepath.Dir(u.Filename()))
 			if err == nil {
 				a.state.mu.Lock()
 				a.state.odyssey = val

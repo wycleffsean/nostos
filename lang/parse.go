@@ -287,6 +287,8 @@ func init() {
 	tokenMap[itemColon] = tokenMapping{precedenceCall, nullDenotationUnhandled, _map}
 	tokenMap[itemArrow] = tokenMapping{precedenceCall, nullDenotationUnhandled, _function}
 	tokenMap[itemShovel] = tokenMapping{precedenceCall, nullDenotationUnhandled, _shovel}
+	tokenMap[itemLeftParen] = tokenMapping{precedenceCall, nullDenotationUnhandled, _call}
+	tokenMap[itemRightParen] = tokenMapping{precedenceLowest, nullDenotationUnhandled, leftDenotationUnhandled}
 	tokenMap[itemList] = tokenMapping{precedenceLowest, _list, leftDenotationUnhandled}
 	tokenMap[itemNumber] = tokenMapping{precedenceLowest, _number, leftDenotationUnhandled}
 	tokenMap[itemString] = tokenMapping{precedenceLowest, _string, leftDenotationUnhandled}
@@ -510,4 +512,16 @@ func _shovel(p *parser, left node) node {
 		return err
 	}
 	return &Shovel{Left: left, Right: right}
+}
+
+func _call(p *parser, left node) node {
+	arg := p.parseExpression(precedenceLowest)
+	if err, ok := arg.(errorNode); ok {
+		return err
+	}
+	if p.peek().typ != itemRightParen {
+		return p._error("expected right paren")
+	}
+	p.accept()
+	return &Call{Func: left, Arg: arg}
 }
