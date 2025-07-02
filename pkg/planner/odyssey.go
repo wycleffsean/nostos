@@ -17,10 +17,10 @@ import (
 )
 
 // odysseyEntry represents a single cluster entry in odyssey.no. Each key in the
-// map is a namespace name and the value is a list of resource file paths that
-// belong to that namespace. The special "default" namespace mirrors the default
-// output in Nix flakes.
-type odysseyEntry map[string][]string
+// map is a namespace name and the value is a list of resources or file paths
+// that belong to that namespace. The special "default" namespace mirrors the
+// default output in Nix flakes.
+type odysseyEntry map[string][]interface{}
 
 // BuildPlanFromOdyssey loads the workspace odyssey.no file and returns a plan
 // for the current Kubernetes context.
@@ -55,7 +55,7 @@ func BuildPlanFromOdyssey(ignoreSystemNamespace, ignoreClusterScoped bool) (*Pla
 
 	var resources []ResourceType
 
-	for ns, files := range entry {
+	for ns, items := range entry {
 		if ns != "" {
 			resources = append(resources, ResourceType{
 				APIVersion: "v1",
@@ -64,15 +64,38 @@ func BuildPlanFromOdyssey(ignoreSystemNamespace, ignoreClusterScoped bool) (*Pla
 			})
 		}
 
-		filePaths := make([]string, 0, len(files))
-		for _, r := range files {
-			filePaths = append(filePaths, filepath.Join(workspace.Dir(), r))
+		var paths []string
+		var inlineObjs []map[string]interface{}
+		for _, it := range items {
+			switch v := it.(type) {
+			case string:
+				paths = append(paths, filepath.Join(workspace.Dir(), v))
+			case map[string]interface{}:
+				inlineObjs = append(inlineObjs, v)
+			default:
+				return nil, fmt.Errorf("unsupported odyssey value %T", it)
+			}
 		}
-		loaded, err := loadResourcesFromFiles(filePaths, ns)
+
+		loaded, err := loadResourcesFromFiles(paths, ns)
 		if err != nil {
 			return nil, err
 		}
 		resources = append(resources, loaded...)
+
+		for _, obj := range inlineObjs {
+			u := &unstructured.Unstructured{Object: obj}
+			rt, err := convertUnstructuredToResourceType(u)
+			if err != nil {
+				return nil, err
+			}
+			if ns != "" {
+				if _, ok := rt.Metadata["namespace"]; !ok {
+					rt.Metadata["namespace"] = ns
+				}
+			}
+			resources = append(resources, rt)
+		}
 	}
 
 	if ignoreSystemNamespace {
