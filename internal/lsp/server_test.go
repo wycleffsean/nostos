@@ -337,7 +337,7 @@ func TestHoverAndCompletion(t *testing.T) {
 			foundBaz = true
 		}
 	}
-	if !(foundFoo && foundBaz) {
+	if !foundFoo || !foundBaz {
 		t.Fatalf("completion did not contain expected symbols: %#v", comp.Items)
 	}
 }

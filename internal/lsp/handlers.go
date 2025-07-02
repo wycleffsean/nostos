@@ -213,7 +213,8 @@ func (h Handler) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
 	ast := lang.NewAst(text, uri.URI(params.TextDocument.URI))
 	diags := []protocol.Diagnostic{}
 	collectDiagnostics(ast.RootNode, &diags)
-	msg := "parsed successfully"
+
+	var msg string
 	if len(diags) > 0 {
 		msg = diags[0].Message
 	} else {
