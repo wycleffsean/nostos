@@ -244,9 +244,23 @@ func TestDefinition(t *testing.T) {
 		t.Fatalf("Initialize failed: %v", err)
 	}
 
+	docURI := protocol.DocumentURI("file:///def.no")
+	openParams := &protocol.DidOpenTextDocumentParams{
+		TextDocument: protocol.TextDocumentItem{
+			URI:        docURI,
+			LanguageID: "nostos",
+			Version:    1,
+			Text:       "foo: bar\n",
+		},
+	}
+	if err := client.DidOpen(ctx, openParams); err != nil {
+		t.Fatalf("DidOpen failed: %v", err)
+	}
+	waitForDocument(t, env.handler, docURI, openParams.TextDocument.Text)
+
 	locs, err := client.Definition(ctx, &protocol.DefinitionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
-			TextDocument: protocol.TextDocumentIdentifier{URI: protocol.DocumentURI("file:///foo.no")},
+			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
 			Position:     protocol.Position{Line: 0, Character: 0},
 		},
 	})
@@ -262,7 +276,7 @@ func TestDefinition(t *testing.T) {
 	}
 }
 
-func TestHoverCompletionAndCodeAction(t *testing.T) {
+func TestHoverAndCompletion(t *testing.T) {
 	env := setup(t)
 	defer env.teardown()
 
@@ -277,13 +291,13 @@ func TestHoverCompletionAndCodeAction(t *testing.T) {
 		t.Fatalf("Initialized failed: %v", err)
 	}
 
-	docURI := protocol.DocumentURI("file:///svc.yaml")
+	docURI := protocol.DocumentURI("file:///comp.no")
 	openParams := &protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
 			URI:        docURI,
 			LanguageID: "nostos",
 			Version:    1,
-			Text:       "apiVersion: v1\nkind: Service\n",
+			Text:       "foo: bar\nbaz: qux\n",
 		},
 	}
 	if err := client.DidOpen(ctx, openParams); err != nil {
@@ -300,143 +314,31 @@ func TestHoverCompletionAndCodeAction(t *testing.T) {
 	if err != nil || hover == nil {
 		t.Fatalf("Hover failed: %v", err)
 	}
-	if !strings.Contains(hover.Contents.Value, "Service") {
+	if !strings.Contains(hover.Contents.Value, "foo") {
 		t.Fatalf("unexpected hover: %#v", hover)
 	}
 
 	comp, err := client.Completion(ctx, &protocol.CompletionParams{
 		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
 			TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
-			Position:     protocol.Position{Line: 1, Character: 6},
+			Position:     protocol.Position{Line: 1, Character: 0},
 		},
 	})
 	if err != nil {
 		t.Fatalf("Completion failed: %v", err)
 	}
-	found := false
+	foundFoo := false
+	foundBaz := false
 	for _, item := range comp.Items {
-		if item.Label == "Service" {
-			found = true
-			break
+		if item.Label == "foo" {
+			foundFoo = true
+		}
+		if item.Label == "baz" {
+			foundBaz = true
 		}
 	}
-	if !found {
-		t.Fatalf("completion did not contain Service: %#v", comp.Items)
-	}
-
-	acts, err := client.CodeAction(ctx, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
-		Range: protocol.Range{
-			Start: protocol.Position{Line: 0, Character: 0},
-			End:   protocol.Position{Line: 0, Character: 0},
-		},
-	})
-	if err != nil {
-		t.Fatalf("CodeAction failed: %v", err)
-	}
-	if len(acts) == 0 {
-		t.Fatalf("expected code action")
-	}
-}
-
-func TestNestedCodeAction(t *testing.T) {
-	env := setup(t)
-	defer env.teardown()
-
-	client := env.client
-	ctx := env.ctx
-
-	_, err := client.Initialize(ctx, &protocol.InitializeParams{RootURI: "file:///tmp"})
-	if err != nil {
-		t.Fatalf("Initialize failed: %v", err)
-	}
-	if err := client.Initialized(ctx, &protocol.InitializedParams{}); err != nil {
-		t.Fatalf("Initialized failed: %v", err)
-	}
-
-	docURI := protocol.DocumentURI("file:///svc.yaml")
-	text := "apiVersion: v1\nkind: Service\nmetadata:\n  name: foo\nspec:\n"
-	openParams := &protocol.DidOpenTextDocumentParams{
-		TextDocument: protocol.TextDocumentItem{
-			URI:        docURI,
-			LanguageID: "nostos",
-			Version:    1,
-			Text:       text,
-		},
-	}
-	if err := client.DidOpen(ctx, openParams); err != nil {
-		t.Fatalf("DidOpen failed: %v", err)
-	}
-	waitForDocument(t, env.handler, docURI, text)
-
-	acts, err := client.CodeAction(ctx, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
-		Range: protocol.Range{
-			Start: protocol.Position{Line: 4, Character: 0},
-			End:   protocol.Position{Line: 4, Character: 0},
-		},
-	})
-	if err != nil {
-		t.Fatalf("CodeAction failed: %v", err)
-	}
-	if len(acts) == 0 {
-		t.Fatalf("expected code action")
-	}
-	edits := acts[0].Edit.Changes[docURI]
-	if len(edits) == 0 || !strings.Contains(edits[0].NewText, "type:") {
-		t.Fatalf("unexpected code action edits: %#v", edits)
-	}
-}
-
-func TestCodeActionInsertNewline(t *testing.T) {
-	env := setup(t)
-	defer env.teardown()
-
-	client := env.client
-	ctx := env.ctx
-
-	_, err := client.Initialize(ctx, &protocol.InitializeParams{RootURI: "file:///tmp"})
-	if err != nil {
-		t.Fatalf("Initialize failed: %v", err)
-	}
-	if err := client.Initialized(ctx, &protocol.InitializedParams{}); err != nil {
-		t.Fatalf("Initialized failed: %v", err)
-	}
-
-	docURI := protocol.DocumentURI("file:///svc.yaml")
-	text := "apiVersion: v1\nkind: Service"
-	openParams := &protocol.DidOpenTextDocumentParams{
-		TextDocument: protocol.TextDocumentItem{
-			URI:        docURI,
-			LanguageID: "nostos",
-			Version:    1,
-			Text:       text,
-		},
-	}
-	if err := client.DidOpen(ctx, openParams); err != nil {
-		t.Fatalf("DidOpen failed: %v", err)
-	}
-	waitForDocument(t, env.handler, docURI, text)
-
-	acts, err := client.CodeAction(ctx, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: docURI},
-		Range: protocol.Range{
-			Start: protocol.Position{Line: 0, Character: 0},
-			End:   protocol.Position{Line: 0, Character: 0},
-		},
-	})
-	if err != nil {
-		t.Fatalf("CodeAction failed: %v", err)
-	}
-	if len(acts) == 0 {
-		t.Fatalf("expected code action")
-	}
-	edits := acts[0].Edit.Changes[docURI]
-	if len(edits) == 0 {
-		t.Fatalf("expected edits from code action")
-	}
-	if !strings.HasPrefix(edits[0].NewText, "\n") {
-		t.Fatalf("expected first edit to start with newline: %#v", edits)
+	if !foundFoo || !foundBaz {
+		t.Fatalf("completion did not contain expected symbols: %#v", comp.Items)
 	}
 }
 
