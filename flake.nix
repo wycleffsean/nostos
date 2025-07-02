@@ -6,7 +6,11 @@
     flake-utils.url = "github:numtide/flake-utils";        # Useful for multi-platform support
   };
 
-  outputs = { self, nixpkgs, flake-utils }: flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system: let
+  outputs = { self, nixpkgs, flake-utils }: flake-utils.lib.eachSystem [
+      "x86_64-linux"
+      "aarch64-linux"
+      "aarch64-darwin"
+  ] (system: let
     pkgs = import nixpkgs {
       inherit system;
     };
