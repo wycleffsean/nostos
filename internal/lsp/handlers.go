@@ -223,10 +223,26 @@ func (h Handler) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
 		return nil, nil
 	}
 
-	msg := td.Kind + " (" + td.Version + ")"
-	if td.Description != "" {
-		msg += " - " + td.Description
+	var root yaml.Node
+	if err := yaml.Unmarshal([]byte(text), &root); err != nil {
+		return nil, nil
 	}
+
+	path, _ := findPathAndNode(&root, int(params.Position.Line))
+
+	msg := ""
+	if fd, ok := fieldDefinitionByPath(td, path); ok {
+		msg = fd.Type
+		if fd.Description != "" {
+			msg += " - " + fd.Description
+		}
+	} else {
+		msg = td.Kind + " (" + td.Version + ")"
+		if td.Description != "" {
+			msg += " - " + td.Description
+		}
+	}
+
 	contents := protocol.MarkupContent{Kind: protocol.Markdown, Value: msg}
 	return &protocol.Hover{Contents: contents}, nil
 }
@@ -508,4 +524,32 @@ func getFields(td types.TypeDefinition, path []string) []types.FieldDefinition {
 		}
 	}
 	return fields
+}
+
+// fieldDefinitionByPath returns the FieldDefinition for a given path within a TypeDefinition.
+func fieldDefinitionByPath(td types.TypeDefinition, path []string) (types.FieldDefinition, bool) {
+	fields := td.Fields
+	var fd types.FieldDefinition
+	for _, p := range path {
+		if strings.HasPrefix(p, "[") {
+			// skip sequence indices
+			continue
+		}
+		found := false
+		for _, f := range fields {
+			if f.Name == p {
+				fd = f
+				fields = f.SubFields
+				found = true
+				break
+			}
+		}
+		if !found {
+			return types.FieldDefinition{}, false
+		}
+	}
+	if fd.Name == "" {
+		return types.FieldDefinition{}, false
+	}
+	return fd, true
 }
