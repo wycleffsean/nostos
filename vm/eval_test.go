@@ -43,15 +43,35 @@ func TestEvalOdysseyExample(t *testing.T) {
 		t.Fatalf("eval error: %v", err)
 	}
 
+	svcPath := filepath.Join("..", "examples", "redis-service.no")
+	svcData, err := os.ReadFile(svcPath)
+	if err != nil {
+		t.Fatalf("read service: %v", err)
+	}
+	_, items = lang.NewStringLexer(string(svcData))
+	p = lang.NewParser(items)
+	svcAST := p.Parse()
+	svcObj, err := EvalWithDir(svcAST, filepath.Dir(svcPath))
+	if err != nil {
+		t.Fatalf("eval service: %v", err)
+	}
+
+	depPath := filepath.Join("..", "examples", "redis-deployment.no")
+	depData, err := os.ReadFile(depPath)
+	if err != nil {
+		t.Fatalf("read deployment: %v", err)
+	}
+	_, items = lang.NewStringLexer(string(depData))
+	p = lang.NewParser(items)
+	depAST := p.Parse()
+	depObj, err := EvalWithDir(depAST, filepath.Dir(depPath))
+	if err != nil {
+		t.Fatalf("eval deployment: %v", err)
+	}
+
 	want := map[string]interface{}{
 		"do-nyc1-k8s-1-33-1-do-0-nyc1-1750371119772": map[string]interface{}{
-			"default": []interface{}{
-				map[string]interface{}{"targetPort": float64(6379)},
-				map[string]interface{}{
-					"image": map[string]interface{}{"redis": "alpine"},
-					"ports": []interface{}{map[string]interface{}{"containerPort": float64(6379)}},
-				},
-			},
+			"default": []interface{}{svcObj, depObj},
 		},
 	}
 
