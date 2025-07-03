@@ -8,7 +8,6 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/yaml"
 
 	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/pkg/kube"
@@ -122,9 +121,16 @@ func loadResourcesFromFiles(paths []string, defaultNS string) ([]ResourceType, e
 			if len(bytes.TrimSpace(d)) == 0 {
 				continue
 			}
-			var obj map[string]interface{}
-			if err := yaml.Unmarshal(d, &obj); err != nil {
+			_, items := lang.NewStringLexer(string(d))
+			parser := lang.NewParser(items)
+			ast := parser.Parse()
+			val, err := vm.EvalWithDir(ast, filepath.Dir(p))
+			if err != nil {
 				return nil, fmt.Errorf("parse %s: %w", p, err)
+			}
+			obj, ok := val.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("expected map in %s", p)
 			}
 			u := &unstructured.Unstructured{Object: obj}
 			rt, err := convertUnstructuredToResourceType(u)
