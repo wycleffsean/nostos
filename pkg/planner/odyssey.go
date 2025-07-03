@@ -21,6 +21,27 @@ import (
 // default output in Nix flakes.
 type odysseyEntry map[string][]interface{}
 
+// EvaluateOdyssey reads and evaluates an odyssey.no file. It returns the
+// fully evaluated structure where any import() calls have been resolved.
+func EvaluateOdyssey(path string) (map[string]odysseyEntry, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read odyssey file: %w", err)
+	}
+	_, items := lang.NewStringLexer(string(data))
+	p := lang.NewParser(items)
+	ast := p.Parse()
+	val, err := vm.EvalWithDir(ast, filepath.Dir(path))
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate odyssey file: %w", err)
+	}
+	entries := make(map[string]odysseyEntry)
+	if err := mapstructure.Decode(val, &entries); err != nil {
+		return nil, fmt.Errorf("failed to decode odyssey file: %w", err)
+	}
+	return entries, nil
+}
+
 // BuildPlanFromOdyssey loads the workspace odyssey.no file and returns a plan
 // for the current Kubernetes context.
 func BuildPlanFromOdyssey(ignoreSystemNamespace, ignoreClusterScoped bool) (*Plan, error) {
@@ -30,21 +51,9 @@ func BuildPlanFromOdyssey(ignoreSystemNamespace, ignoreClusterScoped bool) (*Pla
 	}
 
 	odysseyPath := filepath.Join(workspace.Dir(), "odyssey.no")
-	data, err := os.ReadFile(odysseyPath)
+	entries, err := EvaluateOdyssey(odysseyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read odyssey file: %w", err)
-	}
-	_, items := lang.NewStringLexer(string(data))
-	p := lang.NewParser(items)
-	ast := p.Parse()
-	val, err := vm.EvalWithDir(ast, filepath.Dir(odysseyPath))
-	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate odyssey file: %w", err)
-	}
-
-	entries := make(map[string]odysseyEntry)
-	if err := mapstructure.Decode(val, &entries); err != nil {
-		return nil, fmt.Errorf("failed to decode odyssey file: %w", err)
+		return nil, err
 	}
 
 	entry, ok := entries[ctx]
