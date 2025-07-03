@@ -6,27 +6,27 @@ import "sync"
 // It allows thread-safe addition and lookup of both Kubernetes and user-defined types.
 type Registry struct {
 	mu    sync.RWMutex
-	types map[string]map[string]map[string]TypeDefinition // group -> version -> kind -> TypeDefinition
+	types map[string]map[string]map[string]Type // group -> version -> kind -> Type
 }
 
 // NewRegistry creates a new empty Registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		types: make(map[string]map[string]map[string]TypeDefinition),
+		types: make(map[string]map[string]map[string]Type),
 	}
 }
 
 // AddType stores a TypeDefinition in the registry. If an entry for the same group/version/kind exists, it is overwritten.
 // This method is safe for concurrent use.
-func (r *Registry) AddType(td TypeDefinition) {
+func (r *Registry) AddType(td *ObjectType) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	grp, ver, kind := td.Group, td.Version, td.Kind
 	if r.types[grp] == nil {
-		r.types[grp] = make(map[string]map[string]TypeDefinition)
+		r.types[grp] = make(map[string]map[string]Type)
 	}
 	if r.types[grp][ver] == nil {
-		r.types[grp][ver] = make(map[string]TypeDefinition)
+		r.types[grp][ver] = make(map[string]Type)
 	}
 	r.types[grp][ver][kind] = td
 }
@@ -34,34 +34,39 @@ func (r *Registry) AddType(td TypeDefinition) {
 // GetType retrieves a TypeDefinition by group, version, and kind.
 // It returns the TypeDefinition and true if found, or false if the type is not in the registry.
 // This method is safe for concurrent use.
-func (r *Registry) GetType(group, version, kind string) (TypeDefinition, bool) {
+func (r *Registry) GetType(group, version, kind string) (*ObjectType, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	verMap, ok := r.types[group]
 	if !ok {
-		return TypeDefinition{}, false
+		return nil, false
 	}
 	kindMap, ok := verMap[version]
 	if !ok {
-		return TypeDefinition{}, false
+		return nil, false
 	}
 	td, ok := kindMap[kind]
 	if !ok {
-		return TypeDefinition{}, false
+		return nil, false
 	}
-	return td, true
+	if ot, ok := td.(*ObjectType); ok {
+		return ot, true
+	}
+	return nil, false
 }
 
 // ListTypes returns all TypeDefinitions stored in the registry (for inspection or debugging).
 // This method is safe for concurrent use.
-func (r *Registry) ListTypes() []TypeDefinition {
+func (r *Registry) ListTypes() []*ObjectType {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	var result []TypeDefinition
+	var result []*ObjectType
 	for _, verMap := range r.types {
 		for _, kindMap := range verMap {
 			for _, td := range kindMap {
-				result = append(result, td)
+				if ot, ok := td.(*ObjectType); ok {
+					result = append(result, ot)
+				}
 			}
 		}
 	}
@@ -69,7 +74,7 @@ func (r *Registry) ListTypes() []TypeDefinition {
 }
 
 // TypeDefinitions is an alias for ListTypes for clarity in callers.
-func (r *Registry) TypeDefinitions() []TypeDefinition {
+func (r *Registry) TypeDefinitions() []*ObjectType {
 	return r.ListTypes()
 }
 

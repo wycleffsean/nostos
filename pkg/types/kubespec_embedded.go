@@ -59,7 +59,7 @@ func KubespecRegistry() (*Registry, error) {
 				kind := getStringFieldLocal(gvkMap, "kind")
 				td := convertSchemaToTypeDefLocal(grp, ver, kind, "", schemaObj)
 				setFieldSince(&td, v, since)
-				r.AddType(td)
+				r.AddType(&td)
 			}
 		}
 	}
