@@ -226,8 +226,7 @@ spec:
 	assertScalar(t, <-items, itemSymbol, "containers", 3)
 	assertScalar(t, <-items, itemColon, ":", 3)
 	assertScalar(t, <-items, itemList, "      ", 3) // TODO: this should be "-" or nil
-	// TODO: the indentations after the list are wrong
-	//   we'll need to add 1 to these values, or ignore the list symbol
+	// Indentation following list items should be one level deeper
 	assertScalar(t, <-items, itemSymbol, "name", 4)
 	assertScalar(t, <-items, itemColon, ":", 4)
 	assertScalar(t, <-items, itemString, "example-container", 4)
