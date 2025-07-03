@@ -23,6 +23,9 @@ var evalCmd = &cobra.Command{
 		_, items := lang.NewStringLexer(string(data))
 		p := lang.NewParser(items)
 		ast := p.Parse()
+		if perrs := lang.CollectParseErrors(ast); len(perrs) > 0 {
+			return perrs[0]
+		}
 		res, err := vm.Eval(ast)
 		if err != nil {
 			return err

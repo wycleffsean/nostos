@@ -34,29 +34,13 @@ func diagnosticFromError(err error) protocol.Diagnostic {
 	}
 }
 
-func collectDiagnostics(n interface{}, diags *[]protocol.Diagnostic) {
-	switch t := n.(type) {
-	case *lang.ParseError:
-		*diags = append(*diags, diagnosticFromParseError(t))
-	case *lang.List:
-		for _, c := range *t {
-			collectDiagnostics(c, diags)
-		}
-	case *lang.Map:
-		for k, v := range *t {
-			collectDiagnostics(&k, diags)
-			collectDiagnostics(v, diags)
-		}
-	case *lang.Call:
-		collectDiagnostics(t.Func, diags)
-		collectDiagnostics(t.Arg, diags)
-	case *lang.Function:
-		collectDiagnostics(t.Param, diags)
-		collectDiagnostics(t.Body, diags)
-	case *lang.Shovel:
-		collectDiagnostics(t.Left, diags)
-		collectDiagnostics(t.Right, diags)
+func diagnosticsFromParseErrors(n interface{}) []protocol.Diagnostic {
+	errs := lang.CollectParseErrors(n)
+	diags := make([]protocol.Diagnostic, 0, len(errs))
+	for _, e := range errs {
+		diags = append(diags, diagnosticFromParseError(e))
 	}
+	return diags
 }
 
 func evalForDiagnostics(n interface{}, base string) ([]protocol.Diagnostic, interface{}) {
