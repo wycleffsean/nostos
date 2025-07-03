@@ -86,7 +86,8 @@ func BuildPlanFromOdyssey(ignoreSystemNamespace, ignoreClusterScoped bool) (*Pla
 			u := &unstructured.Unstructured{Object: obj}
 			rt, err := convertUnstructuredToResourceType(u)
 			if err != nil {
-				return nil, err
+				fmt.Printf("Warning: failed to convert resource: %v\n", err)
+				continue
 			}
 			if ns != "" {
 				if _, ok := rt.Metadata["namespace"]; !ok {
@@ -135,7 +136,8 @@ func loadResourcesFromFiles(paths []string, defaultNS string) ([]ResourceType, e
 			u := &unstructured.Unstructured{Object: obj}
 			rt, err := convertUnstructuredToResourceType(u)
 			if err != nil {
-				return nil, err
+				fmt.Printf("Warning: failed to convert resource: %v\n", err)
+				continue
 			}
 			if defaultNS != "" {
 				if _, ok := rt.Metadata["namespace"]; !ok {
