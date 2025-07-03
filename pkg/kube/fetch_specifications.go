@@ -177,12 +177,12 @@ func fetchAndStoreSpecifications(registry *types.Registry) error {
 					registry.AddType(typeDef)
 				} else {
 					// If no schema is provided (should not happen for v1 CRDs with structural schemas), create an empty definition
-					typeDef := types.TypeDefinition{
+					typeDef := &types.ObjectType{
 						Group:   grp,
 						Version: verName,
 						Kind:    kind,
 						Scope:   scope,
-						Fields:  []types.FieldDefinition{}, // no field information available
+						Fields:  map[string]*types.Field{}, // no field information available
 					}
 					registry.AddType(typeDef)
 				}
@@ -222,14 +222,14 @@ func extractDefinitions(specMap map[string]interface{}) (map[string]interface{},
 
 // convertSchemaToTypeDef converts an OpenAPI v3 schema (as a generic map) into a TypeDefinition.
 // It extracts top-level fields and their types, including one level of nested fields for object types.
-func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[string]interface{}) types.TypeDefinition {
-	td := types.TypeDefinition{
+func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[string]interface{}) *types.ObjectType {
+	td := &types.ObjectType{
 		Group:       group,
 		Version:     version,
 		Kind:        kind,
 		Scope:       scope,
 		Description: getStringField(schemaObj, "description"),
-		Fields:      []types.FieldDefinition{},
+		Fields:      map[string]*types.Field{},
 	}
 	// Only proceed if the schema has defined properties (i.e., it's an object schema)
 	properties, ok := schemaObj["properties"].(map[string]interface{})
@@ -241,7 +241,7 @@ func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[st
 		if !ok {
 			continue
 		}
-		fieldDef := types.FieldDefinition{Name: propName}
+		fieldDef := &types.Field{Name: propName}
 		// Determine the field's type
 		fieldType := getStringField(propSchema, "type")
 		if fieldType == "" && propSchema["$ref"] != nil {
@@ -252,7 +252,7 @@ func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[st
 		// Handle object and array types specifically
 		if fieldType == "object" {
 			// If the field is an object, capture one level of its sub-fields (properties)
-			subFields := []types.FieldDefinition{}
+			subFields := map[string]*types.Field{}
 			if subProps, ok := propSchema["properties"].(map[string]interface{}); ok {
 				for subName, subVal := range subProps {
 					subSchema, _ := subVal.(map[string]interface{})
@@ -264,15 +264,14 @@ func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[st
 						ref := fmt.Sprintf("%v", subSchema["$ref"])
 						subFieldType = deriveRefTypeName(ref)
 					}
-					subFields = append(subFields, types.FieldDefinition{
+					subFields[subName] = &types.Field{
 						Name: subName,
-						Type: subFieldType,
-					})
+						Type: &types.PrimitiveType{N: subFieldType},
+					}
 				}
 			}
-			fieldDef.Type = "object"
+			fieldDef.Type = &types.ObjectType{Fields: subFields, Open: propSchema["additionalProperties"] != nil}
 			fieldDef.Description = getStringField(propSchema, "description")
-			fieldDef.SubFields = subFields
 		} else if fieldType == "array" {
 			// If the field is an array, determine the element type
 			elemType := "any"
@@ -286,17 +285,20 @@ func convertSchemaToTypeDef(group, version, kind, scope string, schemaObj map[st
 					elemType = "object"
 				}
 			}
-			fieldDef.Type = "[]" + elemType
+			fieldDef.Type = &types.ListType{Elem: &types.PrimitiveType{N: elemType}}
 		} else if fieldType != "" {
 			// Primitive type (string, integer, boolean, etc.)
-			fieldDef.Type = fieldType
+			fieldDef.Type = &types.PrimitiveType{N: fieldType}
 			fieldDef.Description = getStringField(propSchema, "description")
 		} else {
 			// Fallback if type is unspecified
-			fieldDef.Type = "any"
+			fieldDef.Type = &types.PrimitiveType{N: "any"}
 			fieldDef.Description = getStringField(propSchema, "description")
 		}
-		td.Fields = append(td.Fields, fieldDef)
+		td.Fields[propName] = fieldDef
+	}
+	if addProps, ok := schemaObj["additionalProperties"]; ok && addProps != nil {
+		td.Open = true
 	}
 	return td
 }

@@ -9,18 +9,20 @@ func setFieldSince(td *TypeDefinition, version string, since map[string]map[stri
 	if since[td.Group][td.Kind] == nil {
 		since[td.Group][td.Kind] = map[string]string{}
 	}
-	for i, f := range td.Fields {
-		path := f.Name
+	for name, f := range td.Fields {
+		path := name
 		if _, ok := since[td.Group][td.Kind][path]; !ok {
 			since[td.Group][td.Kind][path] = version
 		}
-		td.Fields[i].Since = since[td.Group][td.Kind][path]
-		for j, sf := range f.SubFields {
-			spath := f.Name + "." + sf.Name
-			if _, ok := since[td.Group][td.Kind][spath]; !ok {
-				since[td.Group][td.Kind][spath] = version
+		f.Since = since[td.Group][td.Kind][path]
+		if obj, ok := f.Type.(*ObjectType); ok {
+			for subName, sf := range obj.Fields {
+				spath := f.Name + "." + subName
+				if _, ok := since[td.Group][td.Kind][spath]; !ok {
+					since[td.Group][td.Kind][spath] = version
+				}
+				sf.Since = since[td.Group][td.Kind][spath]
 			}
-			td.Fields[i].SubFields[j].Since = since[td.Group][td.Kind][spath]
 		}
 	}
 }
@@ -38,14 +40,14 @@ func extractDefinitionsLocal(specMap map[string]interface{}) (map[string]interfa
 	return nil, false
 }
 
-func convertSchemaToTypeDefLocal(group, version, kind, scope string, schemaObj map[string]interface{}) TypeDefinition {
-	td := TypeDefinition{
+func convertSchemaToTypeDefLocal(group, version, kind, scope string, schemaObj map[string]interface{}) ObjectType {
+	td := ObjectType{
 		Group:       group,
 		Version:     version,
 		Kind:        kind,
 		Scope:       scope,
 		Description: getStringFieldLocal(schemaObj, "description"),
-		Fields:      []FieldDefinition{},
+		Fields:      map[string]*Field{},
 	}
 	properties, ok := schemaObj["properties"].(map[string]interface{})
 	if !ok {
@@ -56,7 +58,7 @@ func convertSchemaToTypeDefLocal(group, version, kind, scope string, schemaObj m
 		if !ok {
 			continue
 		}
-		fieldDef := FieldDefinition{Name: propName}
+		fieldDef := &Field{Name: propName}
 		fieldType := getStringFieldLocal(propSchema, "type")
 		if fieldType == "" {
 			if ref, ok := propSchema["$ref"].(string); ok {
@@ -64,7 +66,7 @@ func convertSchemaToTypeDefLocal(group, version, kind, scope string, schemaObj m
 			}
 		}
 		if fieldType == "object" {
-			subFields := []FieldDefinition{}
+			subFields := map[string]*Field{}
 			if subProps, ok := propSchema["properties"].(map[string]interface{}); ok {
 				for subName, subVal := range subProps {
 					subSchema, _ := subVal.(map[string]interface{})
@@ -77,12 +79,11 @@ func convertSchemaToTypeDefLocal(group, version, kind, scope string, schemaObj m
 							subFieldType = deriveRefTypeNameLocal(ref)
 						}
 					}
-					subFields = append(subFields, FieldDefinition{Name: subName, Type: subFieldType})
+					subFields[subName] = &Field{Name: subName, Type: &PrimitiveType{N: subFieldType}}
 				}
 			}
-			fieldDef.Type = "object"
+			fieldDef.Type = &ObjectType{Fields: subFields, Open: propSchema["additionalProperties"] != nil}
 			fieldDef.Description = getStringFieldLocal(propSchema, "description")
-			fieldDef.SubFields = subFields
 		} else if fieldType == "array" {
 			elemType := "any"
 			if items, ok := propSchema["items"].(map[string]interface{}); ok {
@@ -96,15 +97,18 @@ func convertSchemaToTypeDefLocal(group, version, kind, scope string, schemaObj m
 					elemType = "object"
 				}
 			}
-			fieldDef.Type = "[]" + elemType
+			fieldDef.Type = &ListType{Elem: &PrimitiveType{N: elemType}}
 		} else if fieldType != "" {
-			fieldDef.Type = fieldType
+			fieldDef.Type = &PrimitiveType{N: fieldType}
 			fieldDef.Description = getStringFieldLocal(propSchema, "description")
 		} else {
-			fieldDef.Type = "any"
+			fieldDef.Type = &PrimitiveType{N: "any"}
 			fieldDef.Description = getStringFieldLocal(propSchema, "description")
 		}
-		td.Fields = append(td.Fields, fieldDef)
+		td.Fields[propName] = fieldDef
+	}
+	if addProps, ok := schemaObj["additionalProperties"]; ok && addProps != nil {
+		td.Open = true
 	}
 	return td
 }

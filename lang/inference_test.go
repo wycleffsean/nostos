@@ -14,14 +14,14 @@ func parseManifest(input string) node {
 
 func TestInferType(t *testing.T) {
 	registry := types.NewRegistry()
-	td := types.TypeDefinition{
+	td := &types.ObjectType{
 		Group:   "",
 		Version: "v1",
 		Kind:    "MyKind",
-		Fields: []types.FieldDefinition{
-			{Name: "apiVersion", Required: true},
-			{Name: "kind", Required: true},
-			{Name: "metadata", Required: true},
+		Fields: map[string]*types.Field{
+			"apiVersion": {Name: "apiVersion", Type: &types.PrimitiveType{N: "string"}, Required: true},
+			"kind":       {Name: "kind", Type: &types.PrimitiveType{N: "string"}, Required: true},
+			"metadata":   {Name: "metadata", Type: &types.PrimitiveType{N: "string"}, Required: true},
 		},
 	}
 	registry.AddType(td)
@@ -43,13 +43,13 @@ metadata: something
 
 func TestInferTypeNoMatch(t *testing.T) {
 	registry := types.NewRegistry()
-	td := types.TypeDefinition{
+	td := &types.ObjectType{
 		Group:   "",
 		Version: "v1",
 		Kind:    "MyKind",
-		Fields: []types.FieldDefinition{
-			{Name: "apiVersion", Required: true},
-			{Name: "kind", Required: true},
+		Fields: map[string]*types.Field{
+			"apiVersion": {Name: "apiVersion", Type: &types.PrimitiveType{N: "string"}, Required: true},
+			"kind":       {Name: "kind", Type: &types.PrimitiveType{N: "string"}, Required: true},
 		},
 	}
 	registry.AddType(td)
@@ -63,9 +63,12 @@ func TestInferTypeNoMatch(t *testing.T) {
 
 func TestInferTypeMultipleMatch(t *testing.T) {
 	registry := types.NewRegistry()
-	common := []types.FieldDefinition{{Name: "apiVersion", Required: true}, {Name: "kind", Required: true}}
-	registry.AddType(types.TypeDefinition{Group: "", Version: "v1", Kind: "A", Fields: common})
-	registry.AddType(types.TypeDefinition{Group: "", Version: "v1", Kind: "B", Fields: common})
+	common := map[string]*types.Field{
+		"apiVersion": {Name: "apiVersion", Type: &types.PrimitiveType{N: "string"}, Required: true},
+		"kind":       {Name: "kind", Type: &types.PrimitiveType{N: "string"}, Required: true},
+	}
+	registry.AddType(&types.ObjectType{Group: "", Version: "v1", Kind: "A", Fields: common})
+	registry.AddType(&types.ObjectType{Group: "", Version: "v1", Kind: "B", Fields: common})
 
 	manifest := `apiVersion: v1
 kind: A`

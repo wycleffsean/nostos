@@ -1,26 +1,98 @@
 package types
 
-// TypeDefinition represents a Kubernetes or user-defined API type in a simplified schema form.
-// This struct is independent of Kubernetes library types to maintain decoupling from Kubernetes packages.
-type TypeDefinition struct {
-	Group       string            // API group of the type (empty string for core or user-defined types)
-	Version     string            // API version of the type
-	Kind        string            // Kind name of the type
-	Scope       string            // Scope of the resource: "Namespaced" or "Cluster"
-	Fields      []FieldDefinition // Top-level fields of this type (schema of the object)
+// ---------------------------------------------------------------------------
+// Generic type system
+// ---------------------------------------------------------------------------
+
+// Type is the common interface implemented by all types in the system.
+// It exposes a single Name method which should return a human readable name for
+// the type.  Primitive types will return their literal name ("string",
+// "number" etc.) while object types typically return their Kind.
+type Type interface{ Name() string }
+
+// PrimitiveType represents a built in primitive such as string, number or bool.
+type PrimitiveType struct{ N string }
+
+func (p *PrimitiveType) Name() string { return p.N }
+
+// ListType represents a list of another type.
+type ListType struct{ Elem Type }
+
+func (l *ListType) Name() string { return "[]" + l.Elem.Name() }
+
+// Field describes an object field.  The Type field references another Type in
+// the system which may itself be an ObjectType, ListType etc.
+type Field struct {
+	Name        string
+	Type        Type
 	Description string
+	Required    bool
+	Since       string
 }
 
-// FieldDefinition describes a field (property) in a TypeDefinition.
-// If the field is a complex object, SubFields may contain one level of nested fields for introspection.
-type FieldDefinition struct {
-	Name        string // Name of the field
-	Type        string // Data type of the field (e.g., "string", "int", "object", "[]<type>" for arrays)
+// ObjectType represents a Kubernetes (or user defined) resource.  It contains
+// the standard group/version/kind metadata as well as structural information
+// about its fields.  When Open is true additional unknown fields are allowed
+// when validating values against this type.
+type ObjectType struct {
+	Group       string
+	Version     string
+	Kind        string
+	Scope       string
 	Description string
-	Required    bool              // Indicates if the field must appear on the object
-	Since       string            // Kubernetes version when this field was introduced (empty if unknown)
-	SubFields   []FieldDefinition // Nested fields if this field is an object (one level deep)
+	Fields      map[string]*Field
+	Open        bool
 }
+
+func (o *ObjectType) Name() string { return o.Kind }
+
+// FunctionType represents a function that takes a list of parameter types and
+// returns another type.
+type FunctionType struct {
+	Params []Type
+	Result Type
+}
+
+func (f *FunctionType) Name() string { return "func" }
+
+// Extend merges fields from the provided ObjectType into the receiver.  Fields
+// with the same name must be compatible – currently this means they have the
+// same type name.  Required flags are ORed together.  The receiver's Open flag
+// becomes true if either object is open.
+func (o *ObjectType) Extend(other *ObjectType) {
+	if o.Fields == nil {
+		o.Fields = make(map[string]*Field)
+	}
+	for name, f := range other.Fields {
+		if existing, ok := o.Fields[name]; ok {
+			if existing.Type.Name() != f.Type.Name() {
+				// Incompatible, prefer existing - real
+				// implementation could return error, but for
+				// now keep the original field.
+				continue
+			}
+			if f.Required {
+				existing.Required = true
+			}
+		} else {
+			o.Fields[name] = f
+		}
+	}
+	if other.Open {
+		o.Open = true
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Backwards compatibility aliases
+// ---------------------------------------------------------------------------
+
+// For now keep the old names used throughout the codebase.  They are simple
+// type aliases to the new structures so existing callers continue to compile
+// while we migrate the code.
+
+type FieldDefinition = Field
+type TypeDefinition = ObjectType
 
 // FieldType represents a simple enumeration for common field types.
 // type FieldType string

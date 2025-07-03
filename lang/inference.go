@@ -5,10 +5,10 @@ import "github.com/wycleffsean/nostos/pkg/types"
 // InferType attempts to infer the TypeDefinition of a parsed map node based on
 // the required fields of the types stored in the registry. It returns the
 // matching TypeDefinition and true if exactly one match is found.
-func InferType(n node, reg *types.Registry) (types.TypeDefinition, bool) {
+func InferType(n node, reg *types.Registry) (*types.ObjectType, bool) {
 	m, ok := n.(*Map)
 	if !ok {
-		return types.TypeDefinition{}, false
+		return nil, false
 	}
 
 	// Build a set of field names present in the map
@@ -17,12 +17,12 @@ func InferType(n node, reg *types.Registry) (types.TypeDefinition, bool) {
 		fieldNames[sym.Text] = struct{}{}
 	}
 
-	matches := make([]types.TypeDefinition, 0)
+	matches := make([]*types.ObjectType, 0)
 	for _, td := range reg.ListTypes() {
 		match := true
-		for _, f := range td.Fields {
+		for name, f := range td.Fields {
 			if f.Required {
-				if _, ok := fieldNames[f.Name]; !ok {
+				if _, ok := fieldNames[name]; !ok {
 					match = false
 					break
 				}
@@ -36,5 +36,5 @@ func InferType(n node, reg *types.Registry) (types.TypeDefinition, bool) {
 	if len(matches) == 1 {
 		return matches[0], true
 	}
-	return types.TypeDefinition{}, false
+	return nil, false
 }
