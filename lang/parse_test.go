@@ -177,6 +177,30 @@ func TestParseYamlMultiList(t *testing.T) {
 	}
 }
 
+func TestParseYamlListOfMaps(t *testing.T) {
+	got := parseString("list:\n- foo: 123\n  bar: 678")
+
+	listSym := Symbol{Position{}, "list"}
+	fooSym := Symbol{Position{}, "foo"}
+	barSym := Symbol{Position{}, "bar"}
+
+	var item Map = make(map[Symbol]node)
+	item[fooSym] = &Number{Position{}, 123}
+	item[barSym] = &Number{Position{}, 678}
+
+	wantedList := List{&item}
+	var wanted Map = make(map[Symbol]node)
+	wanted[listSym] = &wantedList
+
+	if m, ok := got.(*Map); ok {
+		if !reflect.DeepEqual(*m, wanted) {
+			t.Errorf("unexpected parse result: %#v", *m)
+		}
+	} else {
+		t.Errorf("can't cast to Map: %T", got)
+	}
+}
+
 func TestParseFunction(t *testing.T) {
 	got := parseString("x => x")
 	wanted := &Function{Param: &Symbol{Position{}, "x"}, Body: &Symbol{Position{}, "x"}}

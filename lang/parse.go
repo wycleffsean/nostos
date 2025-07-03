@@ -328,7 +328,20 @@ func (p *parser) Parse() node {
 		// if root != nil && res != root {
 		// 	log.Fatalf("Parse error: document must be a single expression\n\tcurrent token: %v\n\tnext token: %v\n\troot: %v\n\tres:  %v\n", self.current, self.peek(), root, res)
 		// }
-		root = res
+		if rootMap, ok := root.(*Map); ok {
+			if resMap, ok := res.(*Map); ok {
+				for k, v := range *resMap {
+					(*rootMap)[k] = v
+				}
+				root = rootMap
+			} else {
+				root = res
+			}
+		} else if root == nil {
+			root = res
+		} else {
+			root = res
+		}
 		if err, ok := root.(errorNode); ok {
 			return err
 		}
@@ -448,6 +461,7 @@ func _map(p *parser, key node) node {
 		m = &tmp
 	}
 
+	indent := p.currentIndent
 	value := p.parseExpression(precedenceEquality)
 	if err, ok := value.(errorNode); ok {
 		return err
@@ -456,14 +470,18 @@ func _map(p *parser, key node) node {
 	// Update parser state so subsequent key-value pairs at the same indent
 	// are added to this map
 	p.priorNode = m
-	p.priorIndent = p.currentIndent
+	p.priorIndent = indent
+	// Reset currentIndent so the calling parseExpression records the
+	// indentation of the key rather than the value.
+	p.currentIndent = indent
 
 	return m
 }
 
 func _list(p *parser) node {
 	var l *List
-	if prior, ok := p.priorNode.(*List); ok && p.currentIndent == p.priorIndent {
+	listIndent := p.currentIndent
+	if prior, ok := p.priorNode.(*List); ok && listIndent == p.priorIndent {
 		l = prior
 	} else {
 		l = new(List)
@@ -474,20 +492,33 @@ func _list(p *parser) node {
 		if err, ok := value.(errorNode); ok {
 			return err
 		}
+
+		// consume additional expressions that belong to the same list item
+		for {
+			next := p.peek()
+			if next.typ == itemEOF || next.indent <= listIndent {
+				break
+			}
+			if next.typ == itemList && next.indent == listIndent {
+				break
+			}
+			value = p.parseExpression(precedenceEquality)
+			if err, ok := value.(errorNode); ok {
+				return err
+			}
+		}
+
 		*l = append(*l, value)
 
-		// Peek ahead to see if the next token is another list item at
-		// the same indentation level
 		next := p.peek()
-		if next.typ != itemList || next.indent != p.currentIndent {
+		if next.typ != itemList || next.indent != listIndent {
 			break
 		}
-		// consume the '-' token and continue parsing the next item
 		p.accept()
 	}
 
 	p.priorNode = l
-	p.priorIndent = p.currentIndent
+	p.priorIndent = listIndent
 	return l
 }
 
