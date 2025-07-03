@@ -333,11 +333,21 @@ func lexIndent(l *lexer) stateFn {
 }
 
 func lexList(l *lexer) stateFn {
+	listIndent := l.currentIndent
 	l.emit(itemList)
 	if l.next() != '-' {
 		return l.errorf("oops! we were expecting a list here")
 	}
 	l.ignore()
+	if l.peek() == ' ' {
+		l.next() // consume single space after '-'
+		l.ignore()
+	}
+	// YAML treats the content that follows '-' as indented one level
+	// deeper than the dash itself. Adjust the currentIndent so that
+	// map keys defined on the same line as the dash are associated
+	// with the correct indentation level.
+	l.currentIndent = listIndent + 1
 	return lexInDocument
 }
 

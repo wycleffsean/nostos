@@ -116,7 +116,7 @@ func TestLexList(t *testing.T) {
 	_, items := NewStringLexer("- yo")
 	itema, itemb := pair(t, items)
 	assertScalar(t, itema, itemList, "", 0)
-	assertScalar(t, itemb, itemSymbol, "yo", 0)
+	assertScalar(t, itemb, itemSymbol, "yo", 1)
 }
 
 func TestLexMap(t *testing.T) {
@@ -228,18 +228,18 @@ spec:
 	assertScalar(t, <-items, itemList, "      ", 3) // TODO: this should be "-" or nil
 	// TODO: the indentations after the list are wrong
 	//   we'll need to add 1 to these values, or ignore the list symbol
-	assertScalar(t, <-items, itemSymbol, "name", 3)
-	assertScalar(t, <-items, itemColon, ":", 3)
-	assertScalar(t, <-items, itemString, "example-container", 3)
+	assertScalar(t, <-items, itemSymbol, "name", 4)
+	assertScalar(t, <-items, itemColon, ":", 4)
+	assertScalar(t, <-items, itemString, "example-container", 4)
 	assertScalar(t, <-items, itemSymbol, "image", 4)
 	assertScalar(t, <-items, itemColon, ":", 4)
 	assertScalar(t, <-items, itemString, "example-image", 4)
 	assertScalar(t, <-items, itemSymbol, "ports", 4)
 	assertScalar(t, <-items, itemColon, ":", 4)
 	assertScalar(t, <-items, itemList, "        ", 4) // TODO: this should be "-" or nil
-	assertScalar(t, <-items, itemSymbol, "containerPort", 4)
-	assertScalar(t, <-items, itemColon, ":", 4)
-	assertScalar(t, <-items, itemNumber, "8080", 4)
+	assertScalar(t, <-items, itemSymbol, "containerPort", 5)
+	assertScalar(t, <-items, itemColon, ":", 5)
+	assertScalar(t, <-items, itemNumber, "8080", 5)
 	assertEOF(t, items)
 }
 
