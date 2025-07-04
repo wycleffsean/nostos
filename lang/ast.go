@@ -21,7 +21,7 @@ func NewAst(input string, uri uri.URI) Ast {
 		lexer.run()
 	}()
 
-	parser := NewParser(lexer.items)
+	parser := NewParser(lexer.items, uri)
 	parsedItem := parser.Parse()
 
 	return Ast{uri, parsedItem}

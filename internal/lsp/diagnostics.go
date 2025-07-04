@@ -4,6 +4,7 @@ import (
 	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/vm"
 	"go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 func langPosToProtocol(p lang.Position) protocol.Position {
@@ -22,8 +23,15 @@ func diagnosticFromParseError(e *lang.ParseError) protocol.Diagnostic {
 }
 
 func diagnosticFromError(err error) protocol.Diagnostic {
-	if pe, ok := err.(*lang.ParseError); ok {
-		return diagnosticFromParseError(pe)
+	if ne, ok := err.(lang.NostosError); ok {
+		pos := langPosToProtocol(ne.Pos())
+		rng := protocol.Range{Start: pos, End: pos}
+		return protocol.Diagnostic{
+			Range:    rng,
+			Severity: protocol.DiagnosticSeverityError,
+			Source:   "nostos",
+			Message:  ne.Error(),
+		}
 	}
 	// fallback with zero range
 	return protocol.Diagnostic{
@@ -43,8 +51,8 @@ func diagnosticsFromParseErrors(n interface{}) []protocol.Diagnostic {
 	return diags
 }
 
-func evalForDiagnostics(n interface{}, base string) ([]protocol.Diagnostic, interface{}) {
-	val, err := vm.EvalWithDir(n, base)
+func evalForDiagnostics(n interface{}, base string, u uri.URI) ([]protocol.Diagnostic, interface{}) {
+	val, err := vm.EvalWithDir(n, base, u)
 	if err != nil {
 		return []protocol.Diagnostic{diagnosticFromError(err)}, nil
 	}

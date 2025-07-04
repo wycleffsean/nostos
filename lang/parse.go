@@ -34,6 +34,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.lsp.dev/uri"
 )
 
 type parser struct {
@@ -43,11 +45,13 @@ type parser struct {
 	priorIndent   uint
 	priorNode     node
 	tokens        <-chan item
+	uri           uri.URI
 }
 
-func NewParser(tokens <-chan item) *parser {
+func NewParser(tokens <-chan item, u uri.URI) *parser {
 	return &parser{
 		tokens: tokens,
+		uri:    u,
 	}
 }
 
@@ -92,11 +96,16 @@ type errorNode interface {
 // LSP capabilities, and reporting all parse errors in
 // a document instead of just the first
 type ParseError struct {
+	File    uri.URI
 	Message string
 	Token   *item
 }
 
 func (e *ParseError) Pos() Position { return e.Token.position }
+
+func (e *ParseError) URI() uri.URI { return e.File }
+
+func (e *ParseError) StackTrace() []string { return nil }
 
 // func (e *ParseError) End() pos { return pos(e.Token.position.ByteOffset + e.Token.position.ByteLength) }
 func (e *ParseError) Error() string {
@@ -297,7 +306,7 @@ func init() {
 }
 
 func (p *parser) _error(message string) node {
-	return &ParseError{message, p.current}
+	return &ParseError{File: p.uri, Message: message, Token: p.current}
 }
 
 func nullDenotationUnhandled(p *parser) node {

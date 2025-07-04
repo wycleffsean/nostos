@@ -112,7 +112,7 @@ func (a *indexer) reindex() {
 
 		diags := diagnosticsFromParseErrors(ast.RootNode)
 
-		evalDiags, val := evalForDiagnostics(ast.RootNode, filepath.Dir(u.Filename()))
+		evalDiags, val := evalForDiagnostics(ast.RootNode, filepath.Dir(u.Filename()), u)
 		if len(evalDiags) > 0 {
 			diags = append(diags, evalDiags...)
 		}

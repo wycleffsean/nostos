@@ -3,6 +3,10 @@ package vm
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
+	"strings"
+
+	"go.lsp.dev/uri"
 
 	"github.com/wycleffsean/nostos/lang"
 )
@@ -10,11 +14,44 @@ import (
 type VM struct {
 	stack   []interface{}
 	baseDir string
+	uri     uri.URI
 }
 
-func newVM(dir string) *VM { return &VM{stack: make([]interface{}, 0), baseDir: dir} }
+// EvalError represents runtime errors produced during evaluation. It implements
+// lang.NostosError so callers can inspect file position and stack traces.
+type EvalError struct {
+	File     uri.URI
+	Position lang.Position
+	Msg      string
+	Stack    []string
+}
 
-func New() *VM { return newVM(".") }
+func (e *EvalError) Error() string        { return e.Msg }
+func (e *EvalError) URI() uri.URI         { return e.File }
+func (e *EvalError) Pos() lang.Position   { return e.Position }
+func (e *EvalError) StackTrace() []string { return e.Stack }
+
+func newVM(dir string, u uri.URI) *VM {
+	return &VM{stack: make([]interface{}, 0), baseDir: dir, uri: u}
+}
+
+func New() *VM { return newVM(".", uri.URI("")) }
+
+func (v *VM) wrapError(n interface{}, err error) error {
+	if _, ok := err.(lang.NostosError); ok {
+		return err
+	}
+	pos := lang.Position{}
+	if p, ok := n.(interface{ Pos() lang.Position }); ok {
+		pos = p.Pos()
+	}
+	return &EvalError{
+		File:     v.uri,
+		Position: pos,
+		Msg:      err.Error(),
+		Stack:    strings.Split(string(debug.Stack()), "\n"),
+	}
+}
 
 func (v *VM) push(x interface{}) { v.stack = append(v.stack, x) }
 
@@ -52,11 +89,11 @@ func (v *VM) appendItem() {
 }
 
 func Eval(n interface{}) (interface{}, error) {
-	return EvalWithDir(n, ".")
+	return EvalWithDir(n, ".", uri.URI(""))
 }
 
-func EvalWithDir(n interface{}, dir string) (interface{}, error) {
-	vm := newVM(dir)
+func EvalWithDir(n interface{}, dir string, u uri.URI) (interface{}, error) {
+	vm := newVM(dir, u)
 	if err := vm.evalNode(n); err != nil {
 		return nil, err
 	}
@@ -91,7 +128,7 @@ func (v *VM) evalNode(n interface{}) error {
 			v.pushValueToMap()
 		}
 	case *lang.Function:
-		return fmt.Errorf("functions not supported in evaluation")
+		return v.wrapError(node, fmt.Errorf("functions not supported in evaluation"))
 	case *lang.Call:
 		if err := v.evalNode(node.Func); err != nil {
 			return err
@@ -103,19 +140,22 @@ func (v *VM) evalNode(n interface{}) error {
 		arg := v.pop()
 		name, ok := fn.(string)
 		if !ok {
-			return fmt.Errorf("function name must be a symbol")
+			return v.wrapError(node, fmt.Errorf("function name must be a symbol"))
 		}
 		builtin, ok := builtins[name]
 		if !ok {
-			return fmt.Errorf("unknown builtin %s", name)
+			return v.wrapError(node, fmt.Errorf("unknown builtin %s", name))
 		}
-		return builtin(v, arg)
+		if err := builtin(v, arg); err != nil {
+			return v.wrapError(node, err)
+		}
+		return nil
 	case *lang.Shovel:
-		return fmt.Errorf("shovel operator not supported in evaluation")
+		return v.wrapError(node, fmt.Errorf("shovel operator not supported in evaluation"))
 	case *lang.ParseError:
 		return errors.New(node.Error())
 	default:
-		return fmt.Errorf("unknown node type %T", node)
+		return v.wrapError(node, fmt.Errorf("unknown node type %T", node))
 	}
 	return nil
 }

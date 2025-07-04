@@ -217,7 +217,7 @@ func (h Handler) Hover(ctx context.Context, params *protocol.HoverParams) (*prot
 	if len(diags) > 0 {
 		msg = diags[0].Message
 	} else {
-		evalDiags, val := evalForDiagnostics(ast.RootNode, filepath.Dir(uri.URI(params.TextDocument.URI).Filename()))
+		evalDiags, val := evalForDiagnostics(ast.RootNode, filepath.Dir(uri.URI(params.TextDocument.URI).Filename()), uri.URI(params.TextDocument.URI))
 		if len(evalDiags) > 0 {
 			msg = evalDiags[0].Message
 		} else {
