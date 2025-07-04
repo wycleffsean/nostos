@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"go.lsp.dev/uri"
+
 	"github.com/mitchellh/mapstructure"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -29,12 +31,12 @@ func EvaluateOdyssey(path string) (map[string]odysseyEntry, error) {
 		return nil, fmt.Errorf("failed to read odyssey file: %w", err)
 	}
 	_, items := lang.NewStringLexer(string(data))
-	p := lang.NewParser(items)
+	p := lang.NewParser(items, uri.File(path))
 	ast := p.Parse()
 	if perrs := lang.CollectParseErrors(ast); len(perrs) > 0 {
 		return nil, fmt.Errorf("failed to parse odyssey file: %s", perrs[0].Error())
 	}
-	val, err := vm.EvalWithDir(ast, filepath.Dir(path))
+	val, err := vm.EvalWithDir(ast, filepath.Dir(path), uri.File(path))
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate odyssey file: %w", err)
 	}
@@ -135,12 +137,12 @@ func loadResourcesFromFiles(paths []string, defaultNS string) ([]ResourceType, e
 				continue
 			}
 			_, items := lang.NewStringLexer(string(d))
-			parser := lang.NewParser(items)
+			parser := lang.NewParser(items, uri.File(p))
 			ast := parser.Parse()
 			if perrs := lang.CollectParseErrors(ast); len(perrs) > 0 {
 				return nil, fmt.Errorf("parse %s: %s", p, perrs[0].Error())
 			}
-			val, err := vm.EvalWithDir(ast, filepath.Dir(p))
+			val, err := vm.EvalWithDir(ast, filepath.Dir(p), uri.File(p))
 			if err != nil {
 				return nil, fmt.Errorf("parse %s: %w", p, err)
 			}

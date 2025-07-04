@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"go.lsp.dev/uri"
 )
 
 var comments = []struct {
@@ -35,7 +37,7 @@ func TestCommentText(t *testing.T) {
 
 func parseString(input string) node {
 	_, items := NewStringLexer(input)
-	parser := NewParser(items)
+	parser := NewParser(items, uri.URI("test"))
 	return parser.Parse()
 }
 

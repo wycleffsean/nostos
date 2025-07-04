@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"go.lsp.dev/uri"
 )
 
 func TestBuiltinImport(t *testing.T) {
@@ -18,7 +20,7 @@ func TestBuiltinImport(t *testing.T) {
 
 	expr := fmt.Sprintf("foo: import(%s)", file)
 	ast := parse(expr)
-	result, err := EvalWithDir(ast, ".")
+	result, err := EvalWithDir(ast, ".", uri.URI("test"))
 	if err != nil {
 		t.Fatalf("eval error: %v", err)
 	}

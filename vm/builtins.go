@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"go.lsp.dev/uri"
+
 	"github.com/wycleffsean/nostos/lang"
 )
 
@@ -34,12 +36,12 @@ func builtinImport(v *VM, args ...interface{}) error {
 		return err
 	}
 	_, items := lang.NewStringLexer(string(data))
-	p := lang.NewParser(items)
+	p := lang.NewParser(items, uri.File(path))
 	ast := p.Parse()
 	if perrs := lang.CollectParseErrors(ast); len(perrs) > 0 {
 		return perrs[0]
 	}
-	res, err := EvalWithDir(ast, filepath.Dir(path))
+	res, err := EvalWithDir(ast, filepath.Dir(path), uri.File(path))
 	if err != nil {
 		return err
 	}

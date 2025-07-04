@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"go.lsp.dev/uri"
+
 	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/vm"
 )
@@ -17,9 +19,9 @@ func evalExample(name string) (map[string]interface{}, error) {
 		return nil, err
 	}
 	_, items := lang.NewStringLexer(string(data))
-	p := lang.NewParser(items)
+	p := lang.NewParser(items, uri.File(path))
 	ast := p.Parse()
-	val, err := vm.EvalWithDir(ast, filepath.Dir(path))
+	val, err := vm.EvalWithDir(ast, filepath.Dir(path), uri.File(path))
 	if err != nil {
 		return nil, err
 	}

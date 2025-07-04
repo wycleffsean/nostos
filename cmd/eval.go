@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 
+	"go.lsp.dev/uri"
+
 	"github.com/spf13/cobra"
 
 	"github.com/wycleffsean/nostos/lang"
@@ -21,12 +23,12 @@ var evalCmd = &cobra.Command{
 			return err
 		}
 		_, items := lang.NewStringLexer(string(data))
-		p := lang.NewParser(items)
+		p := lang.NewParser(items, uri.URI("stdin"))
 		ast := p.Parse()
 		if perrs := lang.CollectParseErrors(ast); len(perrs) > 0 {
 			return perrs[0]
 		}
-		res, err := vm.Eval(ast)
+		res, err := vm.EvalWithDir(ast, ".", uri.URI("stdin"))
 		if err != nil {
 			return err
 		}

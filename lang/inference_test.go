@@ -3,12 +3,14 @@ package lang
 import (
 	"testing"
 
+	"go.lsp.dev/uri"
+
 	"github.com/wycleffsean/nostos/pkg/types"
 )
 
 func parseManifest(input string) node {
 	_, items := NewStringLexer(input)
-	parser := NewParser(items)
+	parser := NewParser(items, uri.URI("test"))
 	return parser.Parse()
 }
 
