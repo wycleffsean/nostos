@@ -96,9 +96,14 @@ func readLines(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
-func uriPath(u uri.URI) string {
+func uriPath(u uri.URI) (path string) {
 	if u == "" {
 		return ""
 	}
+	defer func() {
+		if recover() != nil {
+			path = string(u)
+		}
+	}()
 	return u.Filename()
 }

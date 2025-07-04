@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/pkg/report"
 	"github.com/wycleffsean/nostos/pkg/workspace"
 )
@@ -22,6 +23,8 @@ var RootCmd = &cobra.Command{
 	Short: "Nostos is a Helm replacement for Kubernetes with its own DSL.",
 	Long: `Nostos is a programming language designed for Kubernetes configuration,
 offering a plan/apply workflow similar to Terraform, as well as an integrated language server.`,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	// Show help if no subcommand is provided
 	Run: func(cmd *cobra.Command, args []string) {
 		// Display help when the root command is executed without
@@ -43,7 +46,11 @@ func Execute() {
 		cobra.CheckErr(err)
 	}
 
-	if err := RootCmd.Execute(); err != nil {
+	cmd, err := RootCmd.ExecuteC()
+	if err != nil {
+		if _, ok := err.(lang.NostosError); !ok {
+			_ = cmd.Usage()
+		}
 		if len(os.Args) > 1 && os.Args[1] == "lsp" {
 			fmt.Println(err)
 		} else {
