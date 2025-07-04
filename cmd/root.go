@@ -4,12 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/mattn/go-isatty"
 	// "path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/wycleffsean/nostos/pkg/report"
 	"github.com/wycleffsean/nostos/pkg/workspace"
 )
 
@@ -41,7 +44,18 @@ func Execute() {
 	}
 
 	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		if len(os.Args) > 1 && os.Args[1] == "lsp" {
+			fmt.Println(err)
+		} else {
+			var f report.Formatter
+			if isatty.IsTerminal(os.Stdout.Fd()) {
+				f = report.NewPrettyFormatter()
+			} else {
+				f = report.NewSimpleFormatter()
+			}
+			r := report.New(f, os.Stdout)
+			r.Report([]error{err})
+		}
 		os.Exit(1)
 	}
 }
