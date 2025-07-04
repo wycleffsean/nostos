@@ -110,8 +110,7 @@ func (a *indexer) reindex() {
 			st.ProcessAst(&ast)
 		}
 
-		diags := []protocol.Diagnostic{}
-		collectDiagnostics(ast.RootNode, &diags)
+		diags := diagnosticsFromParseErrors(ast.RootNode)
 
 		evalDiags, val := evalForDiagnostics(ast.RootNode, filepath.Dir(u.Filename()))
 		if len(evalDiags) > 0 {

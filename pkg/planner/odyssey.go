@@ -31,6 +31,9 @@ func EvaluateOdyssey(path string) (map[string]odysseyEntry, error) {
 	_, items := lang.NewStringLexer(string(data))
 	p := lang.NewParser(items)
 	ast := p.Parse()
+	if perrs := lang.CollectParseErrors(ast); len(perrs) > 0 {
+		return nil, fmt.Errorf("failed to parse odyssey file: %s", perrs[0].Error())
+	}
 	val, err := vm.EvalWithDir(ast, filepath.Dir(path))
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate odyssey file: %w", err)
@@ -134,6 +137,9 @@ func loadResourcesFromFiles(paths []string, defaultNS string) ([]ResourceType, e
 			_, items := lang.NewStringLexer(string(d))
 			parser := lang.NewParser(items)
 			ast := parser.Parse()
+			if perrs := lang.CollectParseErrors(ast); len(perrs) > 0 {
+				return nil, fmt.Errorf("parse %s: %s", p, perrs[0].Error())
+			}
 			val, err := vm.EvalWithDir(ast, filepath.Dir(p))
 			if err != nil {
 				return nil, fmt.Errorf("parse %s: %w", p, err)
