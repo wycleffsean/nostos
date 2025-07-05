@@ -9,8 +9,9 @@ func (l *List) Pos() Position {
 	}
 	pos := (*l)[0].Pos()
 	for _, child := range *l {
-		if pos.Less(child.Pos()) {
-			pos = child.Pos()
+		childPos := child.Pos()
+		if childPos.Less(pos) {
+			pos = childPos
 		}
 	}
 	return pos

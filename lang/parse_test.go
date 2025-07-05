@@ -41,6 +41,41 @@ func parseString(input string) node {
 	return parser.Parse()
 }
 
+func zeroPositions(n node) {
+	switch v := n.(type) {
+	case *String:
+		v.Position = Position{}
+	case *Path:
+		v.Position = Position{}
+	case *Number:
+		v.Position = Position{}
+	case *Symbol:
+		v.Position = Position{}
+	case *List:
+		for i, item := range *v {
+			zeroPositions(item)
+			(*v)[i] = item
+		}
+	case *Map:
+		newMap := make(Map)
+		for k, val := range *v {
+			zeroPositions(val)
+			k.Position = Position{}
+			newMap[k] = val
+		}
+		*v = newMap
+	case *Function:
+		zeroPositions(v.Param)
+		zeroPositions(v.Body)
+	case *Call:
+		zeroPositions(v.Func)
+		zeroPositions(v.Arg)
+	case *Shovel:
+		zeroPositions(v.Left)
+		zeroPositions(v.Right)
+	}
+}
+
 // Tests
 
 // // Scalars
@@ -48,6 +83,7 @@ func TestParseString(t *testing.T) {
 	got := parseString("\"yo\"")
 	// assertScalar(t, got, node{})
 	wanted := String{Position{}, "yo"}
+	zeroPositions(got)
 	if str, ok := got.(*String); ok {
 		if *str != wanted {
 			t.Errorf("got %q, wanted %q", *str, wanted)
@@ -60,6 +96,7 @@ func TestParseString(t *testing.T) {
 func TestParsePath(t *testing.T) {
 	got := parseString("../foo")
 	wanted := Path{Position{}, "../foo"}
+	zeroPositions(got)
 	if p, ok := got.(*Path); ok {
 		if !reflect.DeepEqual(*p, wanted) {
 			t.Errorf("got %#v, wanted %#v", *p, wanted)
@@ -72,6 +109,7 @@ func TestParsePath(t *testing.T) {
 func TestParsePathAbsolute(t *testing.T) {
 	got := parseString("/etc/passwd")
 	wanted := Path{Position{}, "/etc/passwd"}
+	zeroPositions(got)
 	if p, ok := got.(*Path); ok {
 		if !reflect.DeepEqual(*p, wanted) {
 			t.Errorf("got %#v, wanted %#v", *p, wanted)
@@ -91,6 +129,7 @@ func TestParseYamlSimpleMap(t *testing.T) {
 	value := &String{Position{}, "bar"}
 	wanted[key] = value
 
+	zeroPositions(got)
 	if m, ok := got.(*Map); ok {
 		if !reflect.DeepEqual(*m, wanted) {
 			t.Errorf("maps aren't equal")
@@ -110,6 +149,7 @@ func TestParseMultiYamlMap(t *testing.T) {
 		wanted[foo] = value
 		wanted[bar] = value
 
+		zeroPositions(got)
 		if m, ok := got.(*Map); ok {
 			if !reflect.DeepEqual(*m, wanted) {
 				t.Errorf("%s: maps aren't equal - expected: %v got: %v", version, wanted, *m)
@@ -141,6 +181,7 @@ func TestParseYamlNestedMaps(t *testing.T) {
 	wanted[baz] = &child
 	child[foo] = bar
 
+	zeroPositions(got)
 	if m, ok := got.(*Map); ok {
 		if !reflect.DeepEqual(*m, wanted) {
 			t.Errorf("maps aren't equal - expected: %v got: %v", wanted, *m)
@@ -155,6 +196,7 @@ func TestParseYamlSimpleList(t *testing.T) {
 
 	wanted := List{&String{Position{}, "foo"}}
 
+	zeroPositions(got)
 	if l, ok := got.(*List); ok {
 		if !reflect.DeepEqual(*l, wanted) {
 			t.Errorf("lists aren't equal - expected: %v got: %v", wanted, *l)
@@ -170,6 +212,7 @@ func TestParseYamlMultiList(t *testing.T) {
 
 	wanted := List{&String{Position{}, "foo"}, &String{Position{}, "bar"}}
 
+	zeroPositions(got)
 	if l, ok := got.(*List); ok {
 		if !reflect.DeepEqual(*l, wanted) {
 			t.Errorf("lists aren't equal - expected: %v got: %v", wanted, *l)
@@ -194,6 +237,7 @@ func TestParseYamlListOfMaps(t *testing.T) {
 	var wanted Map = make(map[Symbol]node)
 	wanted[listSym] = &wantedList
 
+	zeroPositions(got)
 	if m, ok := got.(*Map); ok {
 		if !reflect.DeepEqual(*m, wanted) {
 			t.Errorf("unexpected parse result: %#v", *m)
@@ -206,6 +250,7 @@ func TestParseYamlListOfMaps(t *testing.T) {
 func TestParseFunction(t *testing.T) {
 	got := parseString("x => x")
 	wanted := &Function{Param: &Symbol{Position{}, "x"}, Body: &Symbol{Position{}, "x"}}
+	zeroPositions(got)
 	if !reflect.DeepEqual(got, wanted) {
 		t.Errorf("function parse mismatch - expected: %#v got: %#v", wanted, got)
 	}
@@ -214,6 +259,7 @@ func TestParseFunction(t *testing.T) {
 func TestParseShovel(t *testing.T) {
 	got := parseString("a << b")
 	wanted := &Shovel{Left: &Symbol{Position{}, "a"}, Right: &Symbol{Position{}, "b"}}
+	zeroPositions(got)
 	if !reflect.DeepEqual(got, wanted) {
 		t.Errorf("shovel parse mismatch - expected: %#v got: %#v", wanted, got)
 	}
@@ -222,6 +268,7 @@ func TestParseShovel(t *testing.T) {
 func TestParseCall(t *testing.T) {
 	got := parseString("foo(bar)")
 	wanted := &Call{Func: &Symbol{Position{}, "foo"}, Arg: &Symbol{Position{}, "bar"}}
+	zeroPositions(got)
 	if !reflect.DeepEqual(got, wanted) {
 		t.Errorf("call parse mismatch - expected: %#v got: %#v", wanted, got)
 	}

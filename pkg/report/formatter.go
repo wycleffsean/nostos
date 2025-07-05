@@ -30,7 +30,7 @@ func (f *SimpleFormatter) Format(err error) string {
 	if ne, ok := err.(lang.NostosError); ok {
 		pos := ne.Pos()
 		path := uriPath(ne.URI())
-		return fmt.Sprintf("%s:%d:%d: %s\n", path, pos.LineNumber, pos.CharacterOffset, err.Error())
+		return fmt.Sprintf("%s:%d:%d: %s\n", path, pos.LineNumber+1, pos.CharacterOffset+1, err.Error())
 	}
 	return err.Error() + "\n"
 }
@@ -45,7 +45,7 @@ func (f *PrettyFormatter) Format(err error) string {
 func formatPretty(ne lang.NostosError, msg string) string {
 	pos := ne.Pos()
 	path := uriPath(ne.URI())
-	header := color.New(color.Bold).Sprintf("%s:%d:%d", path, pos.LineNumber, pos.CharacterOffset)
+	header := color.New(color.Bold).Sprintf("%s:%d:%d", path, pos.LineNumber+1, pos.CharacterOffset+1)
 
 	var sb strings.Builder
 	sb.WriteString(header + "\n")
@@ -54,7 +54,7 @@ func formatPretty(ne lang.NostosError, msg string) string {
 	// attempt to print source context
 	if path != "" {
 		if lines, err := readLines(path); err == nil {
-			line := int(pos.LineNumber)
+			line := int(pos.LineNumber) + 1
 			start := line - 1
 			if start < 1 {
 				start = 1
