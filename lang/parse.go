@@ -247,7 +247,7 @@ type Map map[Symbol]node
 func (m *Map) Pos() Position {
 	var (
 		pos   Position
-		first bool = true
+		first = true
 	)
 	for symbol := range *m {
 		sPos := symbol.Pos()

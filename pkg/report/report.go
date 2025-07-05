@@ -23,9 +23,11 @@ func (r *Reporter) Report(errs []error) {
 		return
 	}
 	for _, err := range errs {
-		fmt.Fprint(r.Out, r.Formatter.Format(err))
+		if _, e := fmt.Fprint(r.Out, r.Formatter.Format(err)); e != nil {
+			return
+		}
 	}
 	if len(errs) > 1 {
-		fmt.Fprintf(r.Out, "\n%d errors\n", len(errs))
+		_, _ = fmt.Fprintf(r.Out, "\n%d errors\n", len(errs))
 	}
 }
