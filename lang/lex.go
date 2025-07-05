@@ -343,6 +343,10 @@ func lexList(l *lexer) stateFn {
 		l.next() // consume single space after '-'
 		l.ignore()
 	}
+	// After consuming the '-' and any following space, update the
+	// character offset so that subsequent tokens on this line
+	// point to the correct column in the source.
+	l.markOffset()
 	// YAML treats the content that follows '-' as indented one level
 	// deeper than the dash itself. Adjust the currentIndent so that
 	// map keys defined on the same line as the dash are associated
