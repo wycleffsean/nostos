@@ -39,7 +39,10 @@ const (
 	itemString
 	itemPath
 	itemSymbol
-	// itemText
+	itemLet
+	itemIn
+
+// itemText
 )
 
 type item struct {
@@ -360,7 +363,14 @@ func lexSymbol(l *lexer) stateFn {
 	for isValidKey(l.peek()) {
 		l.next()
 	}
-	l.emit(itemSymbol)
+	switch l.input[l.start:l.pos] {
+	case "let":
+		l.emit(itemLet)
+	case "in":
+		l.emit(itemIn)
+	default:
+		l.emit(itemSymbol)
+	}
 	return lexInDocument
 }
 

@@ -9,7 +9,7 @@ import (
 )
 
 func FuzzEval(f *testing.F) {
-	seeds := []string{"foo: 1", "x => x", "foo(bar)", "- item"}
+	seeds := []string{"foo: 1", "x => x", "foo(bar)", "- item", "let foo: 1 in foo"}
 	for _, s := range seeds {
 		f.Add(s)
 	}

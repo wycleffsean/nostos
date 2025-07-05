@@ -175,6 +175,17 @@ func TestLexShovel(t *testing.T) {
 	assertEOF(t, items)
 }
 
+func TestLexLet(t *testing.T) {
+	_, items := NewStringLexer("let foo: 1 in foo")
+	assertScalar(t, <-items, itemLet, "let", 0)
+	assertScalar(t, <-items, itemSymbol, "foo", 0)
+	assertScalar(t, <-items, itemColon, ":", 0)
+	assertScalar(t, <-items, itemNumber, "1", 0)
+	assertScalar(t, <-items, itemIn, "in", 0)
+	assertScalar(t, <-items, itemSymbol, "foo", 0)
+	assertEOF(t, items)
+}
+
 func TestLexManifest(t *testing.T) {
 	manifest := `
 apiVersion: "apps/v1"

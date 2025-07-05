@@ -6,7 +6,7 @@ import (
 )
 
 func FuzzParse(f *testing.F) {
-	seeds := []string{"foo: bar", "x => x", "- foo", "apiVersion: \"v1\""}
+	seeds := []string{"foo: bar", "x => x", "- foo", "apiVersion: \"v1\"", "let foo: 1 in foo"}
 	for _, s := range seeds {
 		f.Add(s)
 	}

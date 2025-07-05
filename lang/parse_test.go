@@ -73,6 +73,12 @@ func zeroPositions(n node) {
 	case *Shovel:
 		zeroPositions(v.Left)
 		zeroPositions(v.Right)
+	case *Let:
+		if v.Bindings != nil {
+			zeroPositions(v.Bindings)
+		}
+		zeroPositions(v.Body)
+		v.Position = Position{}
 	}
 }
 
@@ -271,6 +277,18 @@ func TestParseCall(t *testing.T) {
 	zeroPositions(got)
 	if !reflect.DeepEqual(got, wanted) {
 		t.Errorf("call parse mismatch - expected: %#v got: %#v", wanted, got)
+	}
+}
+
+func TestParseLet(t *testing.T) {
+	got := parseString("let foo: 1 in foo")
+	foo := Symbol{Position{}, "foo"}
+	bindings := make(Map)
+	bindings[foo] = &Number{Position{}, 1}
+	wanted := &Let{Bindings: &bindings, Body: &Symbol{Position{}, "foo"}}
+	zeroPositions(got)
+	if !reflect.DeepEqual(got, wanted) {
+		t.Errorf("let parse mismatch - expected: %#v got: %#v", wanted, got)
 	}
 }
 
