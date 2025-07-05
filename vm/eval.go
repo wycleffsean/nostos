@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime/debug"
+	"sort"
 	"strings"
 
 	"go.lsp.dev/uri"
@@ -125,7 +126,15 @@ func (v *VM) evalNode(n interface{}) error {
 		}
 	case *lang.Map:
 		v.createMap()
-		for k, val := range *node {
+		keys := make([]lang.Symbol, 0, len(*node))
+		for k := range *node {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			return keys[i].Position.ByteOffset < keys[j].Position.ByteOffset
+		})
+		for _, k := range keys {
+			val := (*node)[k]
 			v.pushKey(k.Text)
 			if err := v.evalNode(val); err != nil {
 				return err

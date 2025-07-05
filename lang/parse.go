@@ -555,14 +555,38 @@ func _function(p *parser, param node) node {
 
 func _let(p *parser) node {
 	pos := p.current.position
-	bindings := p.parseExpression(precedenceEquality)
-	if err, ok := bindings.(errorNode); ok {
+	bindingsExpr := p.parseExpression(precedenceEquality)
+	if err, ok := bindingsExpr.(errorNode); ok {
 		return err
 	}
-	m, ok := bindings.(*Map)
+	m, ok := bindingsExpr.(*Map)
 	if !ok {
 		return p._error("let bindings must be a map")
 	}
+
+	// Parse additional binding expressions until we encounter 'in'.
+	for {
+		if p.peek().typ == itemIn {
+			break
+		}
+		next := p.parseExpression(precedenceEquality)
+		if err, ok := next.(errorNode); ok {
+			return err
+		}
+		nm, ok := next.(*Map)
+		if !ok {
+			return p._error("let bindings must be a map")
+		}
+		for k, v := range *nm {
+			(*m)[k] = v
+		}
+	}
+
+	// Reset parser state so the body expression doesn't
+	// merge with the binding map via priorNode logic.
+	p.priorNode = nil
+	p.priorIndent = 0
+
 	if p.peek().typ != itemIn {
 		return p._error("expected 'in'")
 	}
