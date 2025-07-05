@@ -245,10 +245,15 @@ type Map map[Symbol]node
 
 // These functions have really terrible O(...) performance
 func (m *Map) Pos() Position {
-	var pos Position
+	var (
+		pos   Position
+		first = true
+	)
 	for symbol := range *m {
-		if pos.Less(symbol.Pos()) {
-			pos = symbol.Pos()
+		sPos := symbol.Pos()
+		if first || sPos.Less(pos) {
+			pos = sPos
+			first = false
 		}
 	}
 	return pos
@@ -441,11 +446,11 @@ func (p *parser) parseExpression(precedence Precedence) node {
 }
 
 func _string(p *parser) node {
-	return &String{Position{}, p.current.val}
+	return &String{p.current.position, p.current.val}
 }
 
 func _path(p *parser) node {
-	return &Path{Position{}, p.current.val}
+	return &Path{p.current.position, p.current.val}
 }
 
 func _number(p *parser) node {
@@ -453,11 +458,11 @@ func _number(p *parser) node {
 	if err != nil {
 		return p._error(err.Error())
 	}
-	return &Number{Position{}, v}
+	return &Number{p.current.position, v}
 }
 
 func symbol(p *parser) node {
-	return &Symbol{Position{}, p.current.val}
+	return &Symbol{p.current.position, p.current.val}
 }
 
 func _map(p *parser, key node) node {

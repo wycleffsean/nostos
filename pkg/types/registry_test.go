@@ -53,7 +53,7 @@ func TestObjectTypeExtend(t *testing.T) {
 }
 
 func TestDefaultRegistry(t *testing.T) {
-	os.Unsetenv("NOSTOS_USE_KUBESPEC")
+	_ = os.Unsetenv("NOSTOS_USE_KUBESPEC")
 	r := DefaultRegistry()
 	svc, ok := r.GetType("", "v1", "Service")
 	if !ok || svc == nil {
@@ -66,8 +66,8 @@ func TestDefaultRegistry(t *testing.T) {
 
 func TestDefaultRegistryUsesKubespec(t *testing.T) {
 	orig := os.Getenv("NOSTOS_USE_KUBESPEC")
-	os.Setenv("NOSTOS_USE_KUBESPEC", "1")
-	defer os.Setenv("NOSTOS_USE_KUBESPEC", orig)
+	_ = os.Setenv("NOSTOS_USE_KUBESPEC", "1")
+	defer func() { _ = os.Setenv("NOSTOS_USE_KUBESPEC", orig) }()
 	r := DefaultRegistry()
 	if len(r.ListTypes()) <= 1 {
 		t.Fatalf("expected kubespec types loaded")

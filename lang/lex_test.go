@@ -119,6 +119,15 @@ func TestLexList(t *testing.T) {
 	assertScalar(t, itemb, itemSymbol, "yo", 1)
 }
 
+func TestLexListSymbolPosition(t *testing.T) {
+	_, items := NewStringLexer("- foo")
+	list := <-items
+	sym := <-items
+	assertScalar(t, list, itemList, "", 0)
+	assertPosition(t, sym, "foo", 2, 3, 0, 2)
+	assertEOF(t, items)
+}
+
 func TestLexMap(t *testing.T) {
 	_, items := NewStringLexer("foo: bar")
 	key, value := keyValue(t, items)
