@@ -49,3 +49,12 @@ nostos diff --ignore-system-namespace=false
 nostos plan --ignore-system-namespace=false --ignore-cluster-scoped=false
 nostos apply --ignore-system-namespace=false --ignore-cluster-scoped=false
 ```
+
+When `nostos eval` is given a directory, that directory becomes the workspace
+and the `odyssey.no` file inside it will be evaluated. These commands are
+therefore equivalent:
+
+```
+nostos eval examples
+nostos eval examples/odyssey.no
+```

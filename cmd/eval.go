@@ -17,7 +17,7 @@ import (
 )
 
 var evalCmd = &cobra.Command{
-	Use:   "eval [file]",
+	Use:   "eval [file|dir]",
 	Short: "Evaluate NostOS code from stdin or a file",
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -30,6 +30,9 @@ var evalCmd = &cobra.Command{
 
 		if len(args) > 0 {
 			path := args[0]
+			if info, statErr := os.Stat(path); statErr == nil && info.IsDir() {
+				path = filepath.Join(path, "odyssey.no")
+			}
 			data, err = os.ReadFile(path)
 			if err != nil {
 				return err
