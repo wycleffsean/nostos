@@ -24,11 +24,13 @@ func _() {
 	_ = x[itemString-13]
 	_ = x[itemPath-14]
 	_ = x[itemSymbol-15]
+	_ = x[itemLet-16]
+	_ = x[itemIn-17]
 }
 
-const _itemType_name = "itemUndefineditemErroritemDotitemDocStartitemDocEnditemEOFitemListitemColonitemArrowitemShovelitemLeftParenitemRightParenitemNumberitemStringitemPathitemSymbol"
+const _itemType_name = "itemUndefineditemErroritemDotitemDocStartitemDocEnditemEOFitemListitemColonitemArrowitemShovelitemLeftParenitemRightParenitemNumberitemStringitemPathitemSymbolitemLetitemIn"
 
-var _itemType_index = [...]uint8{0, 13, 22, 29, 41, 51, 58, 66, 75, 84, 94, 107, 121, 131, 141, 149, 159}
+var _itemType_index = [...]uint8{0, 13, 22, 29, 41, 51, 58, 66, 75, 84, 94, 107, 121, 131, 141, 149, 159, 166, 172}
 
 func (i itemType) String() string {
 	if i < 0 || i >= itemType(len(_itemType_index)-1) {

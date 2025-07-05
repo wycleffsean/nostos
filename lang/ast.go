@@ -40,6 +40,13 @@ func extractSymbols(ast_node node) []*Symbol {
 		symbols = append(symbols, extractSymbolsBinary(node)...)
 	case collectionNode:
 		symbols = append(symbols, extractSymbolsCollection(node)...)
+	case *Let:
+		for k, v := range *node.Bindings {
+			key := k
+			symbols = append(symbols, &key)
+			symbols = append(symbols, extractSymbols(v)...)
+		}
+		symbols = append(symbols, extractSymbols(node.Body)...)
 	default:
 	}
 	return symbols

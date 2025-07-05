@@ -15,6 +15,7 @@ type VM struct {
 	stack   []interface{}
 	baseDir string
 	uri     uri.URI
+	env     map[string]interface{}
 }
 
 // EvalError represents runtime errors produced during evaluation. It implements
@@ -32,7 +33,7 @@ func (e *EvalError) Pos() lang.Position   { return e.Position }
 func (e *EvalError) StackTrace() []string { return e.Stack }
 
 func newVM(dir string, u uri.URI) *VM {
-	return &VM{stack: make([]interface{}, 0), baseDir: dir, uri: u}
+	return &VM{stack: make([]interface{}, 0), baseDir: dir, uri: u, env: make(map[string]interface{})}
 }
 
 func New() *VM { return newVM(".", uri.URI("")) }
@@ -109,7 +110,11 @@ func (v *VM) evalNode(n interface{}) error {
 	case *lang.Number:
 		v.push(node.Value)
 	case *lang.Symbol:
-		v.push(node.Text)
+		if val, ok := v.env[node.Text]; ok {
+			v.push(val)
+		} else {
+			v.push(node.Text)
+		}
 	case *lang.List:
 		v.createList()
 		for _, item := range *node {
@@ -152,6 +157,26 @@ func (v *VM) evalNode(n interface{}) error {
 		return nil
 	case *lang.Shovel:
 		return v.wrapError(node, fmt.Errorf("shovel operator not supported in evaluation"))
+	case *lang.Let:
+		oldEnv := v.env
+		newEnv := make(map[string]interface{})
+		for k, vval := range oldEnv {
+			newEnv[k] = vval
+		}
+		for k, valNode := range *node.Bindings {
+			if err := v.evalNode(valNode); err != nil {
+				return err
+			}
+			newEnv[k.Text] = v.pop()
+		}
+		v.env = newEnv
+		if err := v.evalNode(node.Body); err != nil {
+			return err
+		}
+		result := v.pop()
+		v.env = oldEnv
+		v.push(result)
+		return nil
 	case *lang.ParseError:
 		return errors.New(node.Error())
 	default:

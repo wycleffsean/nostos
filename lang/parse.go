@@ -308,6 +308,8 @@ func init() {
 	tokenMap[itemString] = tokenMapping{precedenceLowest, _string, leftDenotationUnhandled}
 	tokenMap[itemPath] = tokenMapping{precedenceLowest, _path, leftDenotationUnhandled}
 	tokenMap[itemSymbol] = tokenMapping{precedenceLowest, symbol, leftDenotationUnhandled}
+	tokenMap[itemLet] = tokenMapping{precedenceLowest, _let, leftDenotationUnhandled}
+	tokenMap[itemIn] = tokenMapping{precedenceLowest, nullDenotationUnhandled, leftDenotationUnhandled}
 }
 
 func (p *parser) _error(message string) node {
@@ -549,6 +551,27 @@ func _function(p *parser, param node) node {
 
 	f := &Function{Param: sym, Body: body}
 	return f
+}
+
+func _let(p *parser) node {
+	pos := p.current.position
+	bindings := p.parseExpression(precedenceEquality)
+	if err, ok := bindings.(errorNode); ok {
+		return err
+	}
+	m, ok := bindings.(*Map)
+	if !ok {
+		return p._error("let bindings must be a map")
+	}
+	if p.peek().typ != itemIn {
+		return p._error("expected 'in'")
+	}
+	p.accept()
+	body := p.parseExpression(precedenceEquality)
+	if err, ok := body.(errorNode); ok {
+		return err
+	}
+	return &Let{Position: pos, Bindings: m, Body: body}
 }
 
 func _shovel(p *parser, left node) node {

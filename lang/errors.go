@@ -30,5 +30,8 @@ func collectParseErrors(n interface{}, errs *[]*ParseError) {
 	case *Shovel:
 		collectParseErrors(t.Left, errs)
 		collectParseErrors(t.Right, errs)
+	case *Let:
+		collectParseErrors(t.Bindings, errs)
+		collectParseErrors(t.Body, errs)
 	}
 }

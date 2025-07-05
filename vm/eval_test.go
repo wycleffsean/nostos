@@ -29,6 +29,17 @@ func TestEvalSimpleMap(t *testing.T) {
 	}
 }
 
+func TestEvalLet(t *testing.T) {
+	ast := parse("let foo: 1 in foo")
+	result, err := EvalWithDir(ast, ".", uri.URI("test"))
+	if err != nil {
+		t.Fatalf("eval error: %v", err)
+	}
+	if result != float64(1) {
+		t.Fatalf("expected 1 got %#v", result)
+	}
+}
+
 func TestEvalOdysseyExample(t *testing.T) {
 	path := filepath.Join("..", "examples", "odyssey.no")
 	data, err := os.ReadFile(path)
