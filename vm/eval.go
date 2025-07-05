@@ -113,9 +113,31 @@ func (v *VM) evalNode(n interface{}) error {
 	case *lang.Symbol:
 		if val, ok := v.env[node.Text]; ok {
 			v.push(val)
-		} else {
-			v.push(node.Text)
+			break
 		}
+		// TOOD: This is a pretty lame way of dealing with
+		// field access, but gets the job done for now.
+		// Really this should already be present in the AST
+		if strings.Contains(node.Text, ".") {
+			parts := strings.Split(node.Text, ".")
+			cur, ok := v.env[parts[0]]
+			if ok {
+				for _, p := range parts[1:] {
+					m, ok := cur.(map[string]interface{})
+					if !ok {
+						return v.wrapError(node, fmt.Errorf("dot operator requires map"))
+					}
+					val, ok := m[p]
+					if !ok {
+						return v.wrapError(node, fmt.Errorf("unknown field %s", p))
+					}
+					cur = val
+				}
+				v.push(cur)
+				break
+			}
+		}
+		v.push(node.Text)
 	case *lang.List:
 		v.createList()
 		for _, item := range *node {
