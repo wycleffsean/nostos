@@ -87,6 +87,8 @@ func init() {
 	cobra.CheckErr(viper.BindPFlag("ignore_cluster_scoped", RootCmd.PersistentFlags().Lookup("ignore-cluster-scoped")))
 
 	RootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		workspace.Set(viper.GetString("workspace_dir"))
+		if err := workspace.SetSpec(viper.GetString("workspace_dir")); err != nil {
+			cobra.CheckErr(err)
+		}
 	}
 }

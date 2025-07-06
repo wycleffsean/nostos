@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/viper"
+
+	"github.com/wycleffsean/nostos/pkg/urispec"
 )
 
 const key = "workspace_dir"
@@ -21,6 +23,22 @@ func Set(dir string) {
 		dir = abs
 	}
 	viper.Set(key, dir)
+}
+
+// SetSpec resolves the provided URI spec and sets the workspace directory
+// accordingly. If spec is empty, it behaves like Set("").
+func SetSpec(spec string) error {
+	if spec == "" {
+		Set("")
+		return nil
+	}
+	u := urispec.Parse(spec)
+	dir, err := u.LocalPath()
+	if err != nil {
+		return err
+	}
+	Set(dir)
+	return nil
 }
 
 // Dir returns the currently configured workspace directory. If none was set,
