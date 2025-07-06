@@ -12,13 +12,14 @@ import (
 
 	"github.com/wycleffsean/nostos/lang"
 	"github.com/wycleffsean/nostos/pkg/types"
+	"github.com/wycleffsean/nostos/pkg/urispec"
 	"github.com/wycleffsean/nostos/pkg/workspace"
 	"github.com/wycleffsean/nostos/vm"
 )
 
 var evalCmd = &cobra.Command{
-	Use:   "eval [file|dir]",
-	Short: "Evaluate NostOS code from stdin or a file",
+	Use:   "eval [uri]",
+	Short: "Evaluate NostOS code from stdin or a URI",
 	Args:  cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var (
@@ -29,7 +30,11 @@ var evalCmd = &cobra.Command{
 		)
 
 		if len(args) > 0 {
-			path := args[0]
+			spec := urispec.Parse(args[0])
+			path, err := spec.LocalPath()
+			if err != nil {
+				return err
+			}
 			if info, statErr := os.Stat(path); statErr == nil && info.IsDir() {
 				path = filepath.Join(path, "odyssey.no")
 			}
