@@ -107,7 +107,7 @@ func (v *VM) evalNode(n interface{}) error {
 	case *lang.String:
 		v.push(node.Text)
 	case *lang.Path:
-		v.push(node.Text)
+		v.push(node.Spec)
 	case *lang.Number:
 		v.push(node.Value)
 	case *lang.Symbol:
