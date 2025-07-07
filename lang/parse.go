@@ -478,11 +478,47 @@ func _map(p *parser, key node) node {
 	}
 
 	indent := p.currentIndent
+
+	oldNode := p.priorNode
+	oldIndent := p.priorIndent
+	p.priorNode = nil
+	p.priorIndent = 0
+
 	value := p.parseExpression(precedenceEquality)
 	if err, ok := value.(errorNode); ok {
 		return err
 	}
 	(*m)[*key.(*Symbol)] = value
+	p.priorNode = oldNode
+	p.priorIndent = oldIndent
+
+	for {
+		next := p.peek()
+		if next.typ != itemSymbol || next.indent != indent {
+			break
+		}
+		p.accept()
+		k := symbol(p)
+		if p.peek().typ != itemColon {
+			return p._error("expected ':'")
+		}
+		p.accept()
+
+		oldNode := p.priorNode
+		oldIndent := p.priorIndent
+		p.priorNode = nil
+		p.priorIndent = 0
+
+		val := p.parseExpression(precedenceEquality)
+		if err, ok := val.(errorNode); ok {
+			return err
+		}
+		(*m)[*k.(*Symbol)] = val
+
+		p.priorNode = oldNode
+		p.priorIndent = oldIndent
+	}
+
 	// Update parser state so subsequent key-value pairs at the same indent
 	// are added to this map
 	p.priorNode = m
