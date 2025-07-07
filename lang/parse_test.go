@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"go.lsp.dev/uri"
+
+	"github.com/wycleffsean/nostos/pkg/urispec"
 )
 
 var comments = []struct {
@@ -101,7 +103,7 @@ func TestParseString(t *testing.T) {
 
 func TestParsePath(t *testing.T) {
 	got := parseString("../foo")
-	wanted := Path{Position{}, "../foo"}
+	wanted := Path{Position{}, urispec.Parse("../foo")}
 	zeroPositions(got)
 	if p, ok := got.(*Path); ok {
 		if !reflect.DeepEqual(*p, wanted) {
@@ -114,7 +116,7 @@ func TestParsePath(t *testing.T) {
 
 func TestParsePathAbsolute(t *testing.T) {
 	got := parseString("/etc/passwd")
-	wanted := Path{Position{}, "/etc/passwd"}
+	wanted := Path{Position{}, urispec.Parse("/etc/passwd")}
 	zeroPositions(got)
 	if p, ok := got.(*Path); ok {
 		if !reflect.DeepEqual(*p, wanted) {

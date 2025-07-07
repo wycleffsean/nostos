@@ -36,6 +36,8 @@ import (
 	"time"
 
 	"go.lsp.dev/uri"
+
+	"github.com/wycleffsean/nostos/pkg/urispec"
 )
 
 type parser struct {
@@ -229,15 +231,7 @@ type Symbol struct {
 func (s *Symbol) Pos() Position { return s.Position }
 
 // -----------------------------------------------------
-// Path literal
-type Path struct {
-	Position Position
-	Text     string
-}
-
-func (p *Path) Pos() Position { return p.Position }
-
-// func (s *Symbol) End() Position { return pos(int(s.Position) + len(s.Text)) }
+// Path literal parsing is defined in path.go
 
 // -----------------------------------------------------
 // Map - dictionary/hash/associative array
@@ -452,7 +446,8 @@ func _string(p *parser) node {
 }
 
 func _path(p *parser) node {
-	return &Path{p.current.position, p.current.val}
+	spec := urispec.Parse(p.current.val)
+	return &Path{p.current.position, spec}
 }
 
 func _number(p *parser) node {
