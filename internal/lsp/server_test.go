@@ -73,6 +73,7 @@ func (t testStreamServer) ServeStream(ctx context.Context, conn jsonrpc2.Conn) e
 	}
 	handler.state.client = protocol.ClientDispatcher(conn, logger)
 	handler.state.indexer.start(ctx)
+	StartWorkerLoop(ctx, handler.state)
 	if t.handler != nil {
 		*t.handler = handler
 	}

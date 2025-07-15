@@ -29,6 +29,7 @@ func StartServer(logger *zap.Logger) {
 	handler.state.client = client
 
 	handler.state.indexer.start(ctx)
+	StartWorkerLoop(ctx, handler.state)
 
 	if err != nil {
 		logger.Sugar().Fatalf("while initializing handler: %w", err)
