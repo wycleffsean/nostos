@@ -28,9 +28,14 @@ type ServerState struct {
 	diagnostics map[protocol.DocumentURI][]protocol.Diagnostic
 	symbolTable atomic.Pointer[lang.SymbolTable]
 
+	// worker infrastructure
+	DidChangeChan      chan DocumentChangeMsg
+	diagnosticSnapshot atomic.Pointer[DiagnosticSnapshot]
+
 	odyssey interface{}
 
 	indexer *indexer
+	logger  *zap.Logger
 }
 
 // https://pkg.go.dev/go.lsp.dev/protocol#Server
@@ -54,6 +59,8 @@ func NewHandler(ctx context.Context, server protocol.Server, logger *zap.Logger)
 		documents:     make(map[protocol.DocumentURI]string),
 		diagnostics:   make(map[protocol.DocumentURI][]protocol.Diagnostic),
 		registryReady: make(chan *types.Registry),
+		DidChangeChan: make(chan DocumentChangeMsg, 32),
+		logger:        logger,
 	}
 	state.indexer = newIndexer(state)
 
@@ -152,15 +159,26 @@ func (h Handler) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocume
 
 func (h Handler) DidChange(ctx context.Context, params *protocol.DidChangeTextDocumentParams) error {
 	log.Debug("###### DidChange")
+	var latest string
+	for _, change := range params.ContentChanges {
+		latest = change.Text
+	}
+
+	msg := DocumentChangeMsg{
+		URI:     params.TextDocument.URI,
+		Version: params.TextDocument.Version,
+		Text:    latest,
+	}
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+	case h.state.DidChangeChan <- msg:
+		// forwarded
 	default:
-		if h.state.indexer != nil {
-			h.state.indexer.didChange <- *params
-		}
-		return nil
+		h.state.logger.Sugar().Warnf("Dropping DidChange for %s due to full channel", msg.URI)
 	}
+	return nil
 }
 
 // IMPORTANT: You _can't_ take a pointer to your handler struct as the receiver,
