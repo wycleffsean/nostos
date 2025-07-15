@@ -28,11 +28,15 @@ var planCmd = &cobra.Command{
 		desired := odysseyPlan.Resources
 
 		diff := planner.DiffResources(clusterPlan.Resources, desired)
-		plan, err := planner.BuildPlanFromDiff(diff)
+		list, err := planner.BuildPlanFromDiff(diff)
 		if err != nil {
 			return err
 		}
-		printPlan(plan, planColor || isatty.IsTerminal(os.Stdout.Fd()))
+		dag, err := planner.BuildDAG(list)
+		if err != nil {
+			return err
+		}
+		printPlan(dag, planColor || isatty.IsTerminal(os.Stdout.Fd()))
 		return nil
 	},
 }
@@ -42,12 +46,40 @@ func init() {
 	RootCmd.AddCommand(planCmd)
 }
 
-func printPlan(resources []planner.ResourceType, useColor bool) {
+func printPlan(dag *planner.DAG, useColor bool) {
 	if !useColor {
 		color.NoColor = true
 	}
 	blue := color.New(color.FgCyan).SprintFunc()
-	for i, r := range resources {
-		fmt.Printf("%2d. %s\n", i+1, blue(planner.ResourceID(r)))
+	visited := make(map[string]bool)
+	for i, root := range dag.Roots {
+		printNode(root, "", i == len(dag.Roots)-1, visited, blue)
+	}
+}
+
+func printNode(n *planner.Node, prefix string, last bool, visited map[string]bool, colorize func(a ...interface{}) string) {
+	connector := ""
+	if prefix != "" {
+		if last {
+			connector = "└─ "
+		} else {
+			connector = "├─ "
+		}
+	}
+	fmt.Printf("%s%s%s\n", prefix, connector, colorize(planner.ResourceID(n.Resource)))
+	newPrefix := prefix
+	if prefix != "" {
+		if last {
+			newPrefix += "   "
+		} else {
+			newPrefix += "│  "
+		}
+	}
+	visited[n.ID] = true
+	for i, c := range n.Children {
+		if visited[c.ID] {
+			continue
+		}
+		printNode(c, newPrefix, i == len(n.Children)-1, visited, colorize)
 	}
 }
