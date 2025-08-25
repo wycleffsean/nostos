@@ -1,6 +1,0 @@
-# Example NostOS file with a lambda
-apiVersion: v1
-kind: Example
-metadata:
-  name: hello
-compute: x => x
