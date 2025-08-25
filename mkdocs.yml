@@ -1,0 +1,52 @@
+site_name: Nostos
+site_description: >-
+  A functional package manager for Kubernetes — Nix‑like language, Terraform‑style plan/apply, kubectl‑aware LSP.
+site_url: https://<your-gh-username>.github.io/<your-repo>
+repo_url: https://github.com/<your-gh-username>/<your-repo>
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - toc.integrate
+    - header.autohide
+    - search.suggest
+    - search.highlight
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - def_list
+  - footnotes
+  - attr_list
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.emoji
+
+extra_javascript:
+  - assets/asciinema/asciinema-player.js
+extra_css:
+  - assets/asciinema/asciinema-player.css
+  - styles/asciinema.css
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Odyssey Files: odyssey.md
+  - CLI:
+      - Diff: commands/diff.md
+      - Plan: commands/plan.md
+      - Apply: commands/apply.md
+  - Language & LSP: lsp.md
+  - Demos: demos/README.md
